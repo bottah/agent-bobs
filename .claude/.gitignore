@@ -1,0 +1,6 @@
+# Runtime artifacts (not version-controlled)
+audit.log
+subagent.log
+last-session.json
+settings.local.json
+transcript-backups/
