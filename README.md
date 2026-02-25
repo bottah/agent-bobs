@@ -20,7 +20,7 @@ cd /path/to/your/project
 git diff
 
 # Accept
-git add -A && git commit -m "chore: install agent-boilerplate"
+git add -A && git commit -m "chore: install agent-bobs"
 
 # Or reject
 git checkout -- .
