@@ -47,7 +47,7 @@ Create or update a pull request using the `gh` CLI.
      ```
      remote_url=$(git remote get-url origin)
      # Extract owner/repo from SSH or HTTPS URL
-     repo=$(echo "$remote_url" | sed -E 's|.*[:/]([^/]+/[^/]+?)(\.git)?$|\1|')
+     repo=$(echo "$remote_url" | sed -E 's|.*[:/]([^/]+/[^/.]+)(\.git)?$|\1|')
      gh pr create -R "$repo" --title "..." --body "..."
      ```
 9. Show the PR URL to the user
