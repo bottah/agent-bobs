@@ -20,8 +20,8 @@ mkdir -p "$log_dir"
 
 # Build log entry as valid JSON (jq handles escaping; truncate via string slice)
 echo "$json" | jq -c --arg ts "$timestamp" --arg sid "$session_id" --arg tool "$tool_name" \
-  '{ts: $ts, session: $sid, tool: $tool, input: (.tool_input // {} | tostring[:500])}' \
-  >> "$log_file"
+  '{ts: $ts, session: $sid, tool: $tool, input: (.tool_input // {} | tostring | .[0:500])}' \
+  >> "$log_file" 2>/dev/null
 
 # Never block — just log
 exit 0

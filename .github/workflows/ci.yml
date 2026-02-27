@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ─── Lint ────────────────────────────────────────────────────────────
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: Add your linter setup and commands here.
+      # Examples:
+      #   Node: npx eslint .
+      #   Python: ruff check .
+      #   Go: golangci-lint run
+      #   Rust: cargo clippy
+      - name: Lint
+        run: echo "TODO - configure lint command"
+
+  # ─── Unit tests ──────────────────────────────────────────────────────
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: Add your test framework setup and commands here.
+      # Examples:
+      #   Node: npm test
+      #   Python: pytest
+      #   Go: go test ./...
+      #   Rust: cargo test
+      - name: Run unit tests
+        run: echo "TODO - configure test command"
+
+  # ─── Integration / smoke tests (optional) ────────────────────────────
+  # Uncomment and configure if your project needs services (DB, Redis, etc.)
+  #
+  # smoke-tests:
+  #   runs-on: ubuntu-latest
+  #   needs: [lint, unit-tests]
+  #   services:
+  #     # postgres:
+  #     #   image: postgres:16-alpine
+  #     #   env:
+  #     #     POSTGRES_USER: test
+  #     #     POSTGRES_PASSWORD: test
+  #     #     POSTGRES_DB: test_db
+  #     #   ports:
+  #     #     - 5432:5432
+  #     #   options: >-
+  #     #     --health-cmd "pg_isready -U test"
+  #     #     --health-interval 5s
+  #     #     --health-timeout 5s
+  #     #     --health-retries 5
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - name: Run smoke tests
+  #       run: echo "TODO - configure smoke tests"
+
+  # ─── Build (merge to main only) ─────────────────────────────────────
+  build:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      # TODO: Add your build commands here.
+      # Examples:
+      #   Node: npm run build
+      #   Go: go build ./cmd/...
+      #   Docker: docker build -t app:${{ github.sha }} .
+      - name: Build
+        run: echo "TODO - configure build command"

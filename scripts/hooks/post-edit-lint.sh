@@ -63,8 +63,19 @@ elif [[ "$file_path" =~ \.rs$ ]]; then
 # --- Go ---
 elif [[ "$file_path" =~ \.go$ ]]; then
   if command -v golangci-lint &>/dev/null; then
-    lint_output=$(golangci-lint run "$file_path" 2>&1)
-    lint_exit=$?
+    # Find the directory containing go.mod to use as the working directory
+    go_mod_dir="$file_path"
+    while [ "$go_mod_dir" != "/" ]; do
+      go_mod_dir=$(dirname "$go_mod_dir")
+      if [ -f "$go_mod_dir/go.mod" ]; then
+        break
+      fi
+    done
+    if [ -f "$go_mod_dir/go.mod" ]; then
+      rel_file="${file_path#$go_mod_dir/}"
+      lint_output=$(cd "$go_mod_dir" && golangci-lint run "$rel_file" 2>&1)
+      lint_exit=$?
+    fi
   fi
 fi
 

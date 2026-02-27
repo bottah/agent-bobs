@@ -21,6 +21,8 @@ Boilerplate for multi-agent orchestration in Claude Code. Four layers: **agents*
 | `/test` | fork → `builder` | Run tests and summarize results |
 | `/plan` | main | Interactive implementation planning |
 | `/pr` | main | Create or update pull requests via `gh` |
+| `/branch` | main | Create a feature branch from main |
+| `/protect` | main | Configure GitHub branch protection rulesets |
 | `/loop` | main | Iterative fix-and-check until a condition is met |
 | `/handoff` | main | Generate session handoff document |
 
@@ -50,6 +52,23 @@ Replace these placeholders with your project's actual commands. Hooks like `post
 - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`
 - Keep commits atomic -- one logical change per commit
 - Write commit messages that explain *why*, not just *what*
+
+## Git-Ops Workflow
+
+All changes go through feature branches. Direct commits to `main` are blocked at multiple layers.
+
+**Workflow**: `/branch` → make changes → `/commit` → `/pr` → `/review` → squash-merge
+
+**Branch naming**: `type/short-kebab-description` (types match conventional commits: `feat`, `fix`, `docs`, etc.)
+
+| Enforcement Layer | What It Blocks | Mechanism |
+|-------------------|----------------|-----------|
+| `/commit` step 0 | Committing on main | Skill refuses, suggests `/branch` |
+| `/pr` step 1 | PR from main | Skill refuses, suggests `/branch` |
+| `tool-policy.json` | Explicit push to main | Hook denies command |
+| `security-gate.sh` | Force-push to main | Hook denies command (existing) |
+| `context-loader.sh` | Working on main | Warning at session start |
+| GitHub ruleset | Any direct push to main | Server-side enforcement via `/protect` |
 
 ## Hooks (Programmatic Guardrails)
 

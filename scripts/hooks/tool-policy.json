@@ -1,3 +1,19 @@
 {
-  "rules": []
+  "rules": [
+    {
+      "match": "^git push (-.*\\s)?origin main",
+      "mode": "regex",
+      "message": "Direct push to main is blocked. Use /branch to create a feature branch, then /pr to open a pull request."
+    },
+    {
+      "match": "^git push (-.*\\s)?origin master",
+      "mode": "regex",
+      "message": "Direct push to master is blocked. Use /branch to create a feature branch, then /pr to open a pull request."
+    },
+    {
+      "match": "^git push\\s*$",
+      "mode": "regex",
+      "message": "Bare git push without an explicit branch target is blocked. Specify the remote and branch: git push origin <branch-name>"
+    }
+  ]
 }
