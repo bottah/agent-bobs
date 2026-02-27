@@ -6,6 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## Unreleased
 
+### Added
+
+- Default `permissions.allow` and `permissions.deny` rules in `settings.json` to reduce prompt friction
+- `/branch` skill for creating properly-named feature branches from `origin/main`
+- `/protect` skill for applying GitHub branch protection rulesets from `.github/ruleset.json`
+- `.github/workflows/ci.yml` scaffold with placeholder lint, test, and build jobs
+- `.github/ruleset.json` declarative branch protection config (squash-only, linear history, status checks)
+- `.github/pull_request_template.md` with Summary, Changes, Test Plan, and Notes sections
+- Git-Ops Workflow section in `CLAUDE.md` documenting multi-layer enforcement of feature-branch development
+- Auto-post review findings as PR comment via `gh pr comment` in `/review` skill
+- Main-branch warning in `context-loader.sh` at session start
+- `tool-policy.json` rules blocking direct push to main/master
+
+### Changed
+
+- Enhanced `/commit` skill with branch guard (refuses commit on main/master)
+- Enhanced `/pr` skill with branch guard, rebase freshness check, SSH alias workaround, and self-review suggestion
+- Improved Go linting in `post-edit-lint.sh` with go.mod directory discovery
+- Updated reviewer agent to include `gh pr comment` in allowed tools
+
+### Fixed
+
+- Fixed `audit-logger.sh` jq string slicing syntax (`tostring[:500]` → `tostring | .[0:500]`) and added stderr suppression
+- Fixed macOS-incompatible non-greedy regex in `/pr` skill sed command (`[^/]+?` → `[^/.]+`)
+
 ## [0.1.0] - 2026-02-06
 
 ### Security
