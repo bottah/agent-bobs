@@ -26,7 +26,7 @@ The user may provide:
 2. Read the checklist from `checklist.md`
 3. Check for a `REVIEW_GUIDELINES.md` file in the repository root. If it exists, read it and apply its project-specific criteria **in addition to** the built-in checklist. Project guidelines take precedence when they conflict with the default checklist.
 4. For each checklist category, evaluate the code and note findings
-4. Produce a structured review report:
+5. Produce a structured review report:
 
 ```
 ## Review Summary
@@ -49,11 +49,18 @@ The user may provide:
 | ... | pass/warn/fail | ... |
 ```
 
+6. **Post to PR**: If the review is for a PR (PR number given, or the current branch has an open PR), post the review as a PR comment:
+   - Auto-detect repo: `repo=$(git remote get-url origin | sed -E 's|.*[:/]([^/]+/[^/.]+)(\.git)?$|\1|')`
+   - Detect open PR: `gh pr view --json number -q .number -R "$repo" 2>/dev/null`
+   - Post comment: `gh pr comment <number> -R "$repo" --body "<review>"` (use a HEREDOC for the body)
+   - If no PR is associated, just output the review to the terminal
+
 ## Rules
 
 - Be specific: always include file paths and line numbers
 - Prioritize correctness and security over style
 - Acknowledge good patterns, not just problems
+- Always auto-detect `-R owner/repo` from git remote (SSH alias prevents auto-detection)
 
 ## Project-Specific Guidelines
 
