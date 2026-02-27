@@ -43,7 +43,7 @@ Hooks like `post-edit-lint.sh` and `affected-tests.sh` auto-detect common framew
 |-------|-------|---------|
 | `reader` | Read, Glob, Grep | Read-only codebase exploration |
 | `builder` | Read, Glob, Grep, Edit, Write, Bash, Task, NotebookEdit | Full implementation (no web access) |
-| `reviewer` | Read, Glob, Grep, git read commands | Code review without write access |
+| `reviewer` | Read, Glob, Grep, git read commands, gh pr comment | Code review with PR comment posting |
 | `researcher` | Read, Glob, Grep, WebSearch, WebFetch | Web + codebase research |
 
 Agents are defined in `.claude/agents/*.md`. Each file declares an `allowed_tools` list that Claude Code enforces at the platform level.
@@ -58,6 +58,8 @@ Agents are defined in `.claude/agents/*.md`. Each file declares an `allowed_tool
 | `/test` | fork &rarr; `builder` | Run tests and summarize results |
 | `/plan` | main | Interactive implementation planning |
 | `/pr` | main | Create or update pull requests via `gh` |
+| `/branch` | main | Create a feature branch from main |
+| `/protect` | main | Configure GitHub branch protection rulesets |
 | `/loop` | main | Iterative fix-and-check until a condition is met |
 | `/handoff` | main | Generate session handoff document |
 
@@ -115,12 +117,14 @@ Hooks are shell scripts configured in `.claude/settings.json`. They fire at Clau
     team-research.md      # Research team template
     team-review.md        # Review team template
   skills/
+    branch/SKILL.md
     changelog/SKILL.md
     commit/SKILL.md
     handoff/SKILL.md      # + template.md
     loop/SKILL.md
     plan/SKILL.md         # + template.md
     pr/SKILL.md
+    protect/SKILL.md
     review/SKILL.md       # + checklist.md
     test/SKILL.md
   settings.json           # Hook configuration + permissions
@@ -141,6 +145,10 @@ docs/
   CUSTOMIZATION.md        # How to adapt the template
   HOOKS.md                # Hook configuration and gotchas
   PATTERNS.md             # Multi-agent patterns and recipes
+.github/
+  pull_request_template.md  # PR template (Summary, Changes, Test Plan, Notes)
+  ruleset.json              # Branch protection config (applied via /protect)
+  workflows/ci.yml          # CI scaffold (lint, test, build)
 CLAUDE.md                 # Project instructions (read by Claude Code)
 install.sh                # Install into target project
 ```
