@@ -14,6 +14,9 @@ context=""
 branch=$(git branch --show-current 2>/dev/null)
 if [ -n "$branch" ]; then
   context+="Branch: $branch\n"
+  if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then
+    context+="WARNING: You are on the $branch branch. Use /branch to create a feature branch before making changes. Direct commits to $branch are blocked by skill guards and hook policies.\n"
+  fi
 fi
 
 # Uncommitted changes summary
