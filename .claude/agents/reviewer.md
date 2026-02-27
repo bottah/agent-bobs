@@ -8,6 +8,7 @@ allowed_tools:
   - "Bash(git show*)"
   - "Bash(gh pr diff*)"
   - "Bash(gh pr view*)"
+  - "Bash(gh pr comment*)"
 ---
 
 # Reviewer Agent
