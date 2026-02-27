@@ -1,4 +1,32 @@
 {
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(cd *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git fetch *)",
+      "Bash(git push *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(git stash *)",
+      "Bash(git rebase *)",
+      "Bash(gh *)",
+      "Bash(mkdir *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(source *)",
+      "Bash(claude *)",
+      "Task(Explore)",
+      "Task(Plan)",
+      "Task(general-purpose)"
+    ],
+    "deny": [
+      "Edit(.env*)",
+      "Write(.env*)"
+    ]
+  },
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
