@@ -17,7 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Git-Ops Workflow section in `CLAUDE.md` documenting multi-layer enforcement of feature-branch development
 - Auto-post review findings as PR comment via `gh pr comment` in `/review` skill
 - Main-branch warning in `context-loader.sh` at session start
-- `tool-policy.json` rules blocking direct push to main/master
+- `tool-policy.json` rules blocking direct push to main/master and `--admin` bypass on `gh pr merge`
 
 ### Changed
 
