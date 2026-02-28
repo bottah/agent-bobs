@@ -14,6 +14,11 @@
       "match": "^git push\\s*$",
       "mode": "regex",
       "message": "Bare git push without an explicit branch target is blocked. Specify the remote and branch: git push origin <branch-name>"
+    },
+    {
+      "match": "^gh pr merge.*--admin",
+      "mode": "regex",
+      "message": "The --admin flag bypasses all branch protection rules. If status checks are pending, wait for them to complete. If checks are failing, fix the underlying issue."
     }
   ]
 }
