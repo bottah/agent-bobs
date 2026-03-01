@@ -18,15 +18,20 @@ The user may provide:
 
 ## Steps
 
-1. Determine the scope of review:
-   - If a PR number is given: `gh pr diff <number>`
+1. **Extract repo identifier** (required — SSH aliases prevent `gh` auto-detection):
+   ```bash
+   repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/]+)$|\1|')
+   ```
+   Use `-R "$repo"` on **every** `gh` command in this skill.
+2. Determine the scope of review:
+   - If a PR number is given: `gh pr diff <number> -R "$repo"`
    - If a git range is given: `git diff <range>`
    - If a file/glob is given: read those files
    - If nothing: `git diff` (staged + unstaged)
-2. Read the checklist from `checklist.md`
-3. Check for a `REVIEW_GUIDELINES.md` file in the repository root. If it exists, read it and apply its project-specific criteria **in addition to** the built-in checklist. Project guidelines take precedence when they conflict with the default checklist.
-4. For each checklist category, evaluate the code and note findings
-5. Produce a structured review report:
+3. Read the checklist from `checklist.md`
+4. Check for a `REVIEW_GUIDELINES.md` file in the repository root. If it exists, read it and apply its project-specific criteria **in addition to** the built-in checklist. Project guidelines take precedence when they conflict with the default checklist.
+5. For each checklist category, evaluate the code and note findings
+6. Produce a structured review report:
 
 ```
 ## Review Summary
@@ -49,8 +54,7 @@ The user may provide:
 | ... | pass/warn/fail | ... |
 ```
 
-6. **Post to PR**: If the review is for a PR (PR number given, or the current branch has an open PR), post the review as a PR comment:
-   - Auto-detect repo: `repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/]+)$|\1|')`
+7. **Post to PR**: If the review is for a PR (PR number given, or the current branch has an open PR), post the review as a PR comment:
    - Detect open PR: `gh pr view --json number -q .number -R "$repo" 2>/dev/null`
    - Post comment: `gh pr comment <number> -R "$repo" --body "<review>"` (use a HEREDOC for the body)
    - If no PR is associated, just output the review to the terminal
