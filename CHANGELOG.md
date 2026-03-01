@@ -18,6 +18,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Auto-post review findings as PR comment via `gh pr comment` in `/review` skill
 - Main-branch warning in `context-loader.sh` at session start
 - `tool-policy.json` rules blocking direct push to main/master and `--admin` bypass on `gh pr merge`
+- Governance gate job in CI — single required check that aggregates all upstream jobs, decoupling CI additions from `ruleset.json` (#20)
+- `customize_once` mechanism in `install.sh` — skip project-specific files (`README.md`, `CHANGELOG.md`, `CLAUDE.md`, `ci.yml`, `ruleset.json`) on re-install (#23, #27, #32)
 
 ### Changed
 
@@ -25,11 +27,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Enhanced `/pr` skill with branch guard, rebase freshness check, SSH alias workaround, and self-review suggestion
 - Improved Go linting in `post-edit-lint.sh` with go.mod directory discovery
 - Updated reviewer agent to include `gh pr comment` in allowed tools
+- `/review` skill extracts repo conditionally — only when interacting with GitHub, so local-only reviews work without a remote (#34, #37)
 
 ### Fixed
 
 - Fixed `audit-logger.sh` jq string slicing syntax (`tostring[:500]` → `tostring | .[0:500]`) and added stderr suppression
 - Fixed macOS-incompatible non-greedy regex in `/pr` skill sed command (`[^/]+?` → `[^/.]+`)
+- `auto-allow-reads.sh` extracted only one word for `gh` subcommands, so no `gh` read commands were actually auto-allowed; added `pr checks` and `pr diff` (#25)
+- Removed `env`/`printenv` from auto-allow-reads safe list — conflicted with `security-gate.sh` secret leakage protection (#31)
+- Removed `.claude/settings.json` from `path-protector.sh` protected patterns — file is intentionally committed as repo config (#21)
+- Repo extraction regex rejected dots in repo names (e.g., `owner/my.project.git`) (#30)
+- `install.sh` copied session artifacts (transcript backups, session state, subagent logs, handoff docs) into target repos (#22)
+- `install.sh` printed stale `agent-teams` project name instead of `agent-bobs` (#33)
 
 ## [0.1.0] - 2026-02-06
 
