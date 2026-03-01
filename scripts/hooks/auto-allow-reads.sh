@@ -54,9 +54,9 @@ if [ "$tool_name" = "Bash" ] && [ -n "$command" ]; then
       ;;
     gh)
       # Only allow read operations
-      gh_subcmd=$(echo "$command" | sed 's/^gh //' | awk '{print $1}')
+      gh_subcmd=$(echo "$command" | sed 's/^gh //' | awk '{print $1, $2}')
       case "$gh_subcmd" in
-        pr\ view|pr\ list|issue\ view|issue\ list|api|repo\ view|run\ list|run\ view)
+        pr\ view|pr\ list|pr\ checks|pr\ diff|issue\ view|issue\ list|repo\ view|run\ list|run\ view)
           echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
           exit 0
         ;;
