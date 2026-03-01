@@ -277,12 +277,14 @@ When re-invoked with a bead ID or on an existing branch, detect existing state a
 - If the review bead is `closed` → skip to step 8 (merge)
 - If the review bead is `blocked` and cycle limit not reached → resume fix cycle in step 7
 
-On resume, reload `review_bead_id` and `cycle` from the highest-cycle review bead for the feature:
+On resume, reload all workflow state from the highest-cycle review bead for the feature:
 ```bash
 # Find the active review bead (highest cycle) for this feature bead
 review_bead=$(bd list --json | jq -r "[.[] | select(.type == \"review\" and .metadata.feature_bead == \"<feature_bead_id>\")] | sort_by(.metadata.cycle) | last")
 review_bead_id=$(echo "$review_bead" | jq -r '.id')
 cycle=$(echo "$review_bead" | jq -r '.metadata.cycle')
+base_ref=$(echo "$review_bead" | jq -r '.metadata.base_ref')
+head_ref=$(echo "$review_bead" | jq -r '.metadata.head_ref')
 ```
 
 Check for existing state at each step before creating new artifacts.
