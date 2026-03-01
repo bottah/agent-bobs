@@ -42,7 +42,7 @@ Merge is permitted only when **all** of the following are true:
 1. For every configured reviewer, the active review bead (highest `cycle`) is `closed`.
 2. No active review bead is in `open`, `in_progress`, or `blocked`.
 3. Every active closed bead's `head_sha` matches the current PR head.
-4. `cycle + 1 > max_review_cycles` has not triggered.
+4. `cycle <= max_review_cycles` (the current cycle is within the allowed range).
 
 ---
 
@@ -152,7 +152,7 @@ v1 treats `in_progress` as a one-way gate to `closed` or `blocked`. v2 adds a re
 
 Every review bead carries `head_sha` in metadata — the PR commit the review targets. Only Claude manages `head_sha`.
 
-**On claim**: Reviewer reads `head_sha` from bead metadata and verifies it matches `gh pr view <pr> --json -q .headRefOid`. If mismatched, the reviewer must **release the bead** and continue polling:
+**On claim**: Reviewer reads `head_sha` from bead metadata and verifies it matches `gh pr view <pr> -R <repo> --json headRefOid -q .headRefOid`. If mismatched, the reviewer must **release the bead** and continue polling:
 
 ```
 bd update <bead_id> --status open --assignee "" \
@@ -204,7 +204,8 @@ When Claude reads bead notes containing `INFRA_FAILURE:`, it:
 | `REQUEST_CHANGES:` | Reviewer posted REQUEST_CHANGES verdict | Increment cycle, fix code, supersede + re-queue |
 | `INFRA_FAILURE:` | Transient infrastructure error | Log, do not increment cycle, wait for retry |
 | `STALE_SHA:` | Reviewer detected head_sha mismatch | Full cycle reset (no cycle increment) |
-| `TIMEOUT_ALERTED` | Claim timeout alert already posted | Skip re-posting timeout alert |
+| `TIMEOUT_ALERTED` | Unclaimed timeout alert already posted | Skip re-posting timeout alert |
+| `REVIEW_STALLED` | In-progress stall alert already posted | Skip re-posting stall alert |
 
 ---
 
@@ -223,8 +224,8 @@ When Claude reads bead notes containing `INFRA_FAILURE:`, it:
 
 | Condition | Behavior |
 |-----------|----------|
-| PR already merged | Claude detects via `gh pr view --json -q .state`. Close feature bead: `bd close <id> --reason "PR already merged"`. Supersede remaining review beads. |
-| PR closed (not merged) | Claude detects, blocks feature bead: `bd update <id> --status blocked --append-notes "PR closed without merge"`. Supersede remaining review beads. |
+| PR already merged | Claude detects via `gh pr view <pr> -R <repo> --json state -q .state`. Close feature bead: `bd close <id> --reason "PR already merged"`. Supersede remaining review beads. |
+| PR closed (not merged) | Claude detects via `gh pr view <pr> -R <repo> --json state -q .state`, blocks feature bead: `bd update <id> --status blocked --append-notes "PR closed without merge"`. Supersede remaining review beads. |
 | Feature bead already closed | Skill outputs "Issue already closed" and exits. |
 | Review bead assigned to wrong reviewer | This is a post-claim verification failure (see Claim-Race Handling). The reviewer who ran `--claim` releases it (`--status open --assignee ""`) and continues polling. |
 
@@ -234,12 +235,23 @@ When Claude reads bead notes containing `INFRA_FAILURE:`, it:
 
 ## Reviewer Timeout Alerts
 
+### Unclaimed Beads (`open`)
+
 If a review bead has been `open` for longer than `max_wait_minutes` with no reviewer claiming it:
 
 1. Claude posts an event comment: "Reviewer `<id>` has not claimed review bead after N minutes."
 2. **This alert is emitted once per bead per cycle.** Claude records the alert by appending `TIMEOUT_ALERTED` to the bead notes, and checks for this marker before posting again.
 3. Claude continues polling — does not auto-resolve or skip the reviewer.
 4. The timeout is informational, not blocking. The workflow waits until the reviewer comes online or the human intervenes.
+
+### Abandoned Reviews (`in_progress`)
+
+If a review bead has been `in_progress` for longer than `max_wait_minutes` with no verdict posted:
+
+1. Claude posts an event comment: "Reviewer `<id>` claimed review bead but has not posted a verdict after N minutes. Bead may be abandoned."
+2. **This alert is emitted once per bead per cycle.** Claude records the alert by appending `REVIEW_STALLED` to the bead notes, and checks for this marker before posting again.
+3. Claude continues polling — does not auto-release the bead (only the claiming reviewer may release it).
+4. If the reviewer has died, the human must manually release the bead (`bd update <id> --status open --assignee ""`) or close/supersede it.
 
 ---
 

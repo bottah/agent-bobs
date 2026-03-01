@@ -127,7 +127,8 @@ When the reviewer posts REQUEST_CHANGES and Claude pushes fixes:
 
 - Cycles are 1-indexed. The first review bead has `cycle: 1`.
 - `max_review_cycles: 3` allows cycles 1, 2, and 3.
-- Claude stops when `cycle + 1 > max_review_cycles`.
+- Claude stops creating new cycles when `cycle + 1 > max_review_cycles` (i.e., after REQUEST_CHANGES on the final allowed cycle).
+- The merge gate checks `cycle <= max_review_cycles` — an approval on the final cycle is allowed to merge.
 
 ---
 
@@ -137,7 +138,7 @@ Merge is permitted only when **all** of the following are true:
 
 1. The active review bead (highest `cycle`) is `closed`.
 2. The active review bead's `head_sha` matches the current PR head.
-3. `cycle + 1 > max_review_cycles` has not triggered.
+3. `cycle <= max_review_cycles` (the current cycle is within the allowed range).
 
 "Active" = the review bead with the highest `cycle` value. Previous-cycle beads are ignored.
 
