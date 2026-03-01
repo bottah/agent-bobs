@@ -252,7 +252,7 @@ If a review bead has been `in_progress` for longer than `max_wait_minutes` with 
 
 1. Claude posts an event comment: "Reviewer `<id>` claimed review bead but has not posted a verdict after N minutes. Bead may be abandoned."
 2. **This alert is emitted once per bead per cycle.** Claude records the alert by appending `REVIEW_STALLED` to the bead notes, and checks for this marker before posting again.
-3. Claude continues polling — does not auto-release the bead (only the claiming reviewer may release it).
+3. Claude continues polling — does not auto-release the bead. Only the claiming reviewer or a human may release it (see human override in Reviewer Release Path).
 4. If the reviewer has died, the human must manually release the bead (`bd update <id> --status open --assignee ""`) or close/supersede it.
 
 ---
