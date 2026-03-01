@@ -49,12 +49,12 @@ dangerous_regex=(
   'curl\s+.*\|\s*(sh|bash|zsh)'
   'wget\s+.*\|\s*(sh|bash|zsh)'
   # Block commands that expose secrets via environment variables
-  # Requires unquoted $ (actual expansion), not quoted mentions in strings
-  '(^|&&|;|\|)\s*(echo|printf)\s+[^"'"'"']*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
+  # Matches $VAR and "$VAR" forms — double-quoted $ still expands in bash
+  '(^|&&|;|\|)\s*(echo|printf)\s+.*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
   # Block printenv with a specific secret variable name
   '(^|&&|;|\|)\s*(\/usr\/bin\/)?printenv\s+[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
-  # Block environment dump commands (standalone or piped), including absolute paths
-  '(^|&&|;|\|)\s*(\/usr\/bin\/)?(env|printenv)(\s*$|\s*\||\s*;|\s*&&)'
+  # Block environment dump commands (standalone, piped, or with flags), including absolute paths
+  '(^|&&|;|\|)\s*(\/usr\/bin\/)?(env|printenv)(\s+-.*)?\s*(\s*$|\s*\||\s*;|\s*&&)'
   '(^|&&|;|\|)\s*set(\s*$|\s*\||\s*;|\s*&&)'
 )
 
