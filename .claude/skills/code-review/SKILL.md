@@ -38,7 +38,7 @@ gh auth status
   - `pr_label` — from `on_limit_reached:`
 - Extract repo for `gh` commands (SSH aliases prevent auto-detection):
   ```bash
-  repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/.]+)$|\1|')
+  repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/]+)$|\1|')
   ```
 
 ### 1. Resolve issue
@@ -108,8 +108,8 @@ git commit -m "<type>(scope): <description>"
 # Push
 git push -u origin <branch-name>
 
-# Create PR
-gh pr create --title "<type>(scope): <description>" --body "$(cat <<'PREOF'
+# Create PR (always target main explicitly)
+gh pr create --title "<type>(scope): <description>" --base main --body "$(cat <<'PREOF'
 ## Summary
 <summary of changes>
 
@@ -127,14 +127,14 @@ Create a review bead with full metadata for the configured reviewer:
 
 ```bash
 head_sha=$(git rev-parse HEAD)
-base_ref=$(git rev-parse --abbrev-ref HEAD@{upstream} 2>/dev/null | sed 's|origin/||' || echo "main")
+base_ref=$(gh pr view <pr_number> -R "$repo" --json baseRefName -q .baseRefName)
 head_ref=$(git branch --show-current)
 
 bd create \
   --title "Review PR #<pr_number> [$reviewer]" \
   --type review \
   --label "reviewer:$reviewer" \
-  --set-metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"main\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": 1, \"feature_bead\": \"<feature_bead_id>\"}" \
+  --set-metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"$base_ref\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": 1, \"feature_bead\": \"<feature_bead_id>\"}" \
   --json
 ```
 
@@ -157,6 +157,7 @@ Poll the review bead status until resolution or timeout:
 ```bash
 start_time=$(date +%s)
 cycle=1  # current cycle number
+# review_bead_id is set from step 5 (the bead created there)
 
 while true; do
   sleep $poll_interval_seconds
@@ -170,8 +171,8 @@ while true; do
     break
   fi
 
-  # Check review bead status
-  review_status=$(bd show <review-bead-id> --json | jq -r '.status')
+  # Check review bead status (always poll the current cycle's bead)
+  review_status=$(bd show "$review_bead_id" --json | jq -r '.status')
 
   case "$review_status" in
     closed)
@@ -180,7 +181,7 @@ while true; do
       ;;
     blocked)
       # Reviewer requested changes
-      feedback=$(bd show <review-bead-id> --json | jq -r '.notes' | grep 'REQUEST_CHANGES:')
+      feedback=$(bd show "$review_bead_id" --json | jq -r '.notes' | grep 'REQUEST_CHANGES:')
 
       # Check cycle limit
       if [ $((cycle + 1)) -gt $max_review_cycles ]; then
@@ -202,15 +203,15 @@ while true; do
       git commit -m "fix: address review feedback (cycle $((cycle + 1)))"
       git push
 
-      # Create new review bead for next cycle
+      # Create new review bead for next cycle and update the tracked bead ID
       cycle=$((cycle + 1))
       head_sha=$(git rev-parse HEAD)
-      bd create \
+      review_bead_id=$(bd create \
         --title "Review PR #<pr_number> [$reviewer] (cycle $cycle)" \
         --type review \
         --label "reviewer:$reviewer" \
-        --set-metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"main\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": $cycle, \"feature_bead\": \"<feature_bead_id>\"}" \
-        --json
+        --set-metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"$base_ref\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": $cycle, \"feature_bead\": \"<feature_bead_id>\"}" \
+        --json | jq -r '.id')
 
       # Post event comment
       gh pr comment <pr_number> -R "$repo" --body "<!-- beads-event --> Re-review requested: $reviewer (cycle $cycle/$max_review_cycles)"
