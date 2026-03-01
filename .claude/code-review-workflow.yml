@@ -9,6 +9,7 @@
 reviewers:
   codex:
     focus: "security, correctness, edge cases, error handling"
+    github_login: "talosaether"
 
 limits:
   max_review_cycles: 3          # max fix/re-review loops before flagging

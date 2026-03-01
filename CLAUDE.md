@@ -8,7 +8,7 @@ Boilerplate for multi-agent orchestration in Claude Code. Four layers: **agents*
 |-------|-------|---------|
 | `reader` | Read, Glob, Grep | Read-only codebase exploration |
 | `builder` | Read, Glob, Grep, Edit, Write, Bash, Task, NotebookEdit | Full implementation (no web access) |
-| `reviewer` | Read, Glob, Grep, git read commands, gh pr comment | Code review with PR comment posting |
+| `reviewer` | Read, Glob, Grep, git read commands, gh pr comment, gh-review.sh | Code review with formal PR reviews |
 | `researcher` | Read, Glob, Grep, WebSearch, WebFetch | Web + codebase research |
 
 ## Skill Inventory
@@ -102,6 +102,8 @@ Cross-platform code review using beads for coordination. Claude implements featu
 **Requirements**: `bd` CLI, `gh` CLI (authenticated), beads database (`bd init`)
 
 **Flow**: resolve issue → branch → implement → PR → review bead → poll for verdict → fix if needed → merge on approval
+
+**Reviewer identity**: Formal PR reviews are posted as `talosaether` via `gh-review.sh`, enabling GitHub's `required_approving_review_count` enforcement. Informational comments still use the author's identity via `gh pr comment`.
 
 See `docs/BEADS.md` for full setup guide, configuration reference, and troubleshooting.
 

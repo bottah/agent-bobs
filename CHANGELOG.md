@@ -8,6 +8,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Added
 
+- `gh-review.sh` wrapper for submitting formal GitHub PR reviews as the dedicated reviewer identity (`talosaether`)
+- `github_login` config field in `.claude/code-review-workflow.yml` to separate beads label from GitHub identity
+- Tool-policy rule blocking direct `gh api .../reviews` calls — must use `gh-review.sh` wrapper
 - Default `permissions.allow` and `permissions.deny` rules in `settings.json` to reduce prompt friction
 - `/branch` skill for creating properly-named feature branches from `origin/main`
 - `/protect` skill for applying GitHub branch protection rulesets from `.github/ruleset.json`
@@ -36,6 +39,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Enhanced `/commit` skill with branch guard (refuses commit on main/master)
 - Enhanced `/pr` skill with branch guard, rebase freshness check, SSH alias workaround, and self-review suggestion
 - Improved Go linting in `post-edit-lint.sh` with go.mod directory discovery
+- `/review` skill posts formal reviews (approve/request-changes) via `gh-review.sh` instead of `gh pr comment`
+- Reviewer agent uses `gh-review.sh` for formal verdicts, `gh pr comment` for informational notes
 - Updated reviewer agent to include `gh pr comment` in allowed tools
 - `/review` skill extracts repo conditionally — only when interacting with GitHub, so local-only reviews work without a remote (#34, #37)
 

@@ -86,18 +86,18 @@ loop forever:
   verdict, review_body = perform_review(pr_diff, feature_context)
 
   if verdict is APPROVE:
-    gh api repos/<repo>/pulls/<pr>/reviews \
-      -f event=APPROVE -f body=<review_body> -f commit_id=<head_sha>
+    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
+      --event APPROVE --body <review_body> --commit-id <head_sha>
     bd close <bead_id> --reason "Approved at <head_sha>"
 
   if verdict is REQUEST_CHANGES:
-    gh api repos/<repo>/pulls/<pr>/reviews \
-      -f event=REQUEST_CHANGES -f body=<review_body> -f commit_id=<head_sha>
+    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
+      --event REQUEST_CHANGES --body <review_body> --commit-id <head_sha>
     bd update <bead_id> --status blocked \
       --append-notes "REQUEST_CHANGES: <review_body>"
 ```
 
-**Reviewer requirements**: `bd` CLI, `gh` CLI, repo read access, review write access, no merge permission.
+**Reviewer requirements**: `bd` CLI, `gh` CLI with `talosaether` auth context (`gh auth login`, then select the `talosaether` account), repo read access, review write access, no merge permission.
 
 ## Observability
 

@@ -24,6 +24,11 @@
       "match": "^gh pr merge(?!.*--squash)",
       "mode": "pcre",
       "message": "Use --squash flag for PR merges to maintain linear history."
+    },
+    {
+      "match": "^gh api repos/.*/pulls/.*/reviews.*-f ",
+      "mode": "regex",
+      "message": "Direct review API calls are blocked. Use ./scripts/hooks/gh-review.sh to submit formal PR reviews."
     }
   ]
 }

@@ -9,6 +9,7 @@ allowed_tools:
   - "Bash(gh pr diff*)"
   - "Bash(gh pr view*)"
   - "Bash(gh pr comment*)"
+  - "Bash(./scripts/hooks/gh-review.sh*)"
 ---
 
 # Reviewer Agent
@@ -24,3 +25,8 @@ You are a code reviewer. You can read the codebase and inspect git history, but 
 - Provide actionable feedback -- suggest fixes, not just problems
 - Acknowledge what's done well, not just issues
 - Use `git diff` and `git log` to understand the change in context
+
+## Formal Reviews
+
+- For approve/request-changes verdicts, use `./scripts/hooks/gh-review.sh` to post formal GitHub reviews as the dedicated reviewer identity
+- For informational notes only (no verdict), use `gh pr comment` as before
