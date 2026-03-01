@@ -50,11 +50,17 @@ dangerous_regex=(
   'wget\s+.*\|\s*(sh|bash|zsh)'
   # Block commands that expose secrets via environment variables
   # Matches $VAR and "$VAR" forms — double-quoted $ still expands in bash
+  # Note: also blocks single-quoted '$VAR' which doesn't expand. This is intentional —
+  # regex cannot reliably parse shell quoting (nested quotes, heredocs, escapes), so we
+  # err toward false positives. A blocked command can be manually approved; a leaked
+  # secret cannot be unleaked.
   '(^|&&|;|\|)\s*(echo|printf)\s+.*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
   # Block printenv with a specific secret variable name
   '(^|&&|;|\|)\s*(\/usr\/bin\/)?printenv\s+[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
-  # Block environment dump commands (standalone, piped, or with flags), including absolute paths
-  '(^|&&|;|\|)\s*(\/usr\/bin\/)?(env|printenv)(\s+-.*)?\s*(\s*$|\s*\||\s*;|\s*&&)'
+  # Block environment dump commands, including absolute paths
+  # Bare env/printenv, or with dump flags (-0, --null). Allows env VAR=val cmd (process launch).
+  '(^|&&|;|\|)\s*(\/usr\/bin\/)?(env|printenv)\s*(\s*$|\s*\||\s*;|\s*&&)'
+  '(^|&&|;|\|)\s*(\/usr\/bin\/)?(env|printenv)\s+(-0|--null)'
   '(^|&&|;|\|)\s*set(\s*$|\s*\||\s*;|\s*&&)'
 )
 
