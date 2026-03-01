@@ -1,5 +1,5 @@
 {
-  "_comment": "Branch protection ruleset applied via /protect skill. Edit this file and re-run /protect to update. Note: required_approving_review_count is 0 because GitHub does not allow self-approval — solo devs cannot satisfy a review requirement.",
+  "_comment": "Branch protection ruleset applied via /protect skill. Edit this file and re-run /protect to update. Reviews are submitted by the dedicated reviewer account (talosaether) via gh-review.sh.",
   "ruleset": {
     "name": "main-protection",
     "target": "branch",
@@ -14,7 +14,7 @@
       {
         "type": "pull_request",
         "parameters": {
-          "required_approving_review_count": 0,
+          "required_approving_review_count": 1,
           "dismiss_stale_reviews_on_push": true,
           "require_code_owner_review": false,
           "require_last_push_approval": false,
