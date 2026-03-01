@@ -51,11 +51,8 @@ gh issue view <N> -R "$repo" --json title,body,labels
 ```
 Create a feature bead with the issue title and body. Store metadata:
 ```bash
-bd create --title "<issue title>" --body "<issue body>" --type feature --json
-```
-Then update metadata with `github_issue` and `repo`:
-```bash
-bd update <bead-id> --set-metadata '{"github_issue": <N>, "repo": "<repo>"}'
+bd create --title "<issue title>" --description "<issue body>" --type feature \
+  --metadata '{"github_issue": <N>, "repo": "<repo>"}' --json
 ```
 Claim the bead:
 ```bash
@@ -132,9 +129,9 @@ head_ref=$(git branch --show-current)
 
 review_bead_id=$(bd create \
   --title "Review PR #<pr_number> [$reviewer]" \
-  --type review \
-  --label "reviewer:$reviewer" \
-  --set-metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"$base_ref\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": 1, \"feature_bead\": \"<feature_bead_id>\"}" \
+  --type task \
+  --labels "type:review,reviewer:$reviewer" \
+  --metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"$base_ref\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": 1, \"feature_bead\": \"<feature_bead_id>\"}" \
   --json | jq -r '.id')
 cycle=1
 ```
@@ -173,7 +170,8 @@ while true; do
   fi
 
   # Check review bead status (always poll the current cycle's bead)
-  review_status=$(bd show "$review_bead_id" --json | jq -r '.status')
+  # Note: bd show --json returns an array; use .[0] to get the object
+  review_status=$(bd show "$review_bead_id" --json | jq -r '.[0].status')
 
   case "$review_status" in
     closed)
@@ -182,7 +180,7 @@ while true; do
       ;;
     blocked)
       # Reviewer requested changes
-      feedback=$(bd show "$review_bead_id" --json | jq -r '.notes' | grep 'REQUEST_CHANGES:')
+      feedback=$(bd show "$review_bead_id" --json | jq -r '.[0].notes' | grep 'REQUEST_CHANGES:')
 
       # Check cycle limit
       if [ $((cycle + 1)) -gt $max_review_cycles ]; then
@@ -209,9 +207,9 @@ while true; do
       head_sha=$(git rev-parse HEAD)
       review_bead_id=$(bd create \
         --title "Review PR #<pr_number> [$reviewer] (cycle $cycle)" \
-        --type review \
-        --label "reviewer:$reviewer" \
-        --set-metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"$base_ref\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": $cycle, \"feature_bead\": \"<feature_bead_id>\"}" \
+        --type task \
+        --labels "type:review,reviewer:$reviewer" \
+        --metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"$base_ref\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": $cycle, \"feature_bead\": \"<feature_bead_id>\"}" \
         --json | jq -r '.id')
 
       # Post event comment
@@ -229,8 +227,10 @@ done
 Before merging, verify all three merge gate conditions:
 
 ```bash
+# Note: bd show --json returns an array; use .[0] to get the object
+
 # 1. Active review bead (highest cycle) must be closed
-review_status=$(bd show <active-review-bead-id> --json | jq -r '.status')
+review_status=$(bd show "$review_bead_id" --json | jq -r '.[0].status')
 if [ "$review_status" != "closed" ]; then
   echo "Merge gate failed: review bead is '$review_status', not 'closed'."
   bd update <feature-bead-id> --status blocked
@@ -238,7 +238,7 @@ if [ "$review_status" != "closed" ]; then
 fi
 
 # 2. Review bead head_sha must match current PR head
-review_sha=$(bd show <active-review-bead-id> --json | jq -r '.metadata.head_sha')
+review_sha=$(bd show "$review_bead_id" --json | jq -r '.[0].metadata.head_sha')
 pr_head=$(gh pr view <pr_number> -R "$repo" --json headRefOid -q .headRefOid)
 if [ "$review_sha" != "$pr_head" ]; then
   gh pr comment <pr_number> -R "$repo" --body "<!-- beads-event --> Merge blocked: reviewed SHA ($review_sha) doesn't match PR head ($pr_head). Manual investigation required."
@@ -248,7 +248,7 @@ if [ "$review_sha" != "$pr_head" ]; then
 fi
 
 # 3. Cycle must be within allowed range
-review_cycle=$(bd show <active-review-bead-id> --json | jq -r '.metadata.cycle')
+review_cycle=$(bd show "$review_bead_id" --json | jq -r '.[0].metadata.cycle')
 if [ "$review_cycle" -gt "$max_review_cycles" ]; then
   echo "Merge gate failed: cycle $review_cycle exceeds max $max_review_cycles."
   exit 1
@@ -285,7 +285,7 @@ head_ref=$(git branch --show-current)
 
 Then, if a review bead exists, reload cycle state from the highest-cycle review bead:
 ```bash
-review_bead=$(bd list --json | jq -r "[.[] | select(.type == \"review\" and .metadata.feature_bead == \"<feature_bead_id>\")] | sort_by(.metadata.cycle) | last")
+review_bead=$(bd list --json --label "type:review" | jq -r "[.[] | select(.metadata.feature_bead == \"<feature_bead_id>\")] | sort_by(.metadata.cycle) | last")
 if [ "$review_bead" != "null" ] && [ -n "$review_bead" ]; then
   review_bead_id=$(echo "$review_bead" | jq -r '.id')
   cycle=$(echo "$review_bead" | jq -r '.metadata.cycle')
