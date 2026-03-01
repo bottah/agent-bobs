@@ -138,6 +138,7 @@ v1 treats `in_progress` as a one-way gate to `closed` or `blocked`. v2 adds a re
 | `in_progress` | Reviewer | Claim verification failed | `open` |
 | `in_progress` | Reviewer | `STALE_SHA` detected | `open` |
 | `in_progress` | Reviewer | `INFRA_FAILURE` after retries | `open` |
+| `in_progress` | Human | Abandoned claim (reviewer died) | `open` |
 
 **Release command**: `bd update <id> --status open --assignee "" --append-notes "<REASON>: <details>" --json`
 
@@ -145,6 +146,7 @@ v1 treats `in_progress` as a one-way gate to `closed` or `blocked`. v2 adds a re
 - Reviewer release back to `open` is permitted only for: claim verification failure, `STALE_SHA` detection, or `INFRA_FAILURE` after retries.
 - These are recovery paths, not errors. The bead returns to the pool for retry.
 - A reviewer may only release a bead whose `--claim` it initiated. Claim verification failure counts — the reviewer ran `--claim`, so it is the claimer even if the post-claim state is unexpected.
+- **Human override**: A human may release any abandoned `in_progress` bead regardless of who claimed it. This is the only recovery path when a reviewer dies mid-review. Claude cannot release `in_progress` beads — only humans and the claiming reviewer can.
 
 ---
 
