@@ -34,7 +34,6 @@ protected_patterns=(
   "credentials/*"
   "config/production/*"
   "**/secrets/*"
-  ".claude/settings.json"
 )
 
 for pattern in "${protected_patterns[@]}"; do
