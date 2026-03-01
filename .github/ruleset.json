@@ -1,5 +1,5 @@
 {
-  "_comment": "Branch protection ruleset applied via /protect skill. Edit this file and re-run /protect to update.",
+  "_comment": "Branch protection ruleset applied via /protect skill. Edit this file and re-run /protect to update. Note: required_approving_review_count is 0 because GitHub does not allow self-approval — solo devs cannot satisfy a review requirement.",
   "ruleset": {
     "name": "main-protection",
     "target": "branch",
@@ -26,8 +26,7 @@
         "parameters": {
           "strict_required_status_checks_policy": false,
           "required_status_checks": [
-            { "context": "lint" },
-            { "context": "unit-tests" }
+            { "context": "governance" }
           ]
         }
       },
