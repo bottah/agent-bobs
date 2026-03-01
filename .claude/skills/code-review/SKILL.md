@@ -283,6 +283,7 @@ On resume, reload all workflow state from the highest-cycle review bead for the 
 review_bead=$(bd list --json | jq -r "[.[] | select(.type == \"review\" and .metadata.feature_bead == \"<feature_bead_id>\")] | sort_by(.metadata.cycle) | last")
 review_bead_id=$(echo "$review_bead" | jq -r '.id')
 cycle=$(echo "$review_bead" | jq -r '.metadata.cycle')
+pr_number=$(echo "$review_bead" | jq -r '.metadata.pr')
 base_ref=$(echo "$review_bead" | jq -r '.metadata.base_ref')
 head_ref=$(echo "$review_bead" | jq -r '.metadata.head_ref')
 ```
