@@ -18,6 +18,7 @@
       "Bash(npx *)",
       "Bash(source *)",
       "Bash(claude *)",
+      "Bash(bd *)",
       "Task(Explore)",
       "Task(Plan)",
       "Task(general-purpose)"
@@ -138,6 +139,15 @@
             "type": "command",
             "command": "./scripts/hooks/affected-tests.sh",
             "timeout": 45
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./scripts/hooks/beads-logger.sh"
           }
         ]
       },

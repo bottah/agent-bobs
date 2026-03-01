@@ -42,6 +42,21 @@ if [ "$stash_count" -gt 0 ]; then
   context+="Stashes: $stash_count\n"
 fi
 
+# Beads status (if bd CLI is available)
+if command -v bd &>/dev/null; then
+  # Active review beads (open or in_progress)
+  active_reviews=$(bd list --json 2>/dev/null | jq -r '[.[] | select(.type == "review" and (.status == "open" or .status == "in_progress"))] | length' 2>/dev/null)
+  if [ -n "$active_reviews" ] && [ "$active_reviews" -gt 0 ]; then
+    review_details=$(bd list --json 2>/dev/null | jq -r '[.[] | select(.type == "review" and (.status == "open" or .status == "in_progress"))] | .[] | "  \(.id): \(.title) [cycle \(.metadata.cycle // "?"), reviewer: \(.metadata.reviewer // "?"), status: \(.status)]"' 2>/dev/null)
+    context+="Active review beads ($active_reviews):\n$review_details\n"
+  fi
+  # In-progress feature beads
+  feature_count=$(bd list --json 2>/dev/null | jq -r '[.[] | select(.type == "feature" and .status == "in_progress")] | length' 2>/dev/null)
+  if [ -n "$feature_count" ] && [ "$feature_count" -gt 0 ]; then
+    context+="In-progress feature beads: $feature_count\n"
+  fi
+fi
+
 # Previous session context (written by session-cleanup.sh)
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 last_session="$repo_root/.claude/last-session.json"

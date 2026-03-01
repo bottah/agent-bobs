@@ -28,6 +28,7 @@ exclude=(
   --exclude='.claude/subagent.log'
   --exclude='.claude/transcript-backups'
   --exclude='docs/handoff-*.md'
+  --exclude='.beads'
 )
 
 # Project-specific files that are customized after initial install.
@@ -38,6 +39,7 @@ customize_once=(
   CLAUDE.md
   .github/workflows/ci.yml
   .github/ruleset.json
+  .claude/code-review-workflow.yml
 )
 
 for f in "${customize_once[@]}"; do
@@ -51,6 +53,12 @@ rsync -a "${exclude[@]}" "$SCRIPT_DIR/" "$TARGET/"
 
 # Ensure hook scripts are executable
 chmod +x "$TARGET"/scripts/hooks/*.sh 2>/dev/null || true
+
+# Initialize beads database if bd CLI is available and not already initialized
+if command -v bd &>/dev/null && [ ! -d "$TARGET/.beads" ]; then
+  echo "Initializing beads database..."
+  (cd "$TARGET" && bd init) || true
+fi
 
 echo "Done."
 echo ""

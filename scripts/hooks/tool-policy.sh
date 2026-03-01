@@ -40,6 +40,10 @@ while [ "$i" -lt "$rule_count" ]; do
       if echo "$command" | grep -qE "$match"; then
         blocked=true
       fi
+    elif [ "$mode" = "pcre" ]; then
+      if echo "$command" | perl -ne "exit 0 if /$match/; exit 1" 2>/dev/null; then
+        blocked=true
+      fi
     else
       # Default: substring match (word-boundary aware via grep -w where possible)
       if echo "$command" | grep -qw "$match" 2>/dev/null || [[ "$command" == *"$match"* ]]; then
