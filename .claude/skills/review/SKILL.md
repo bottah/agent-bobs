@@ -53,13 +53,20 @@ The user may provide:
 | ... | pass/warn/fail | ... |
 ```
 
-6. **Post to PR**: If the review is for a PR (PR number given, or the current branch has an open PR), post the review as a PR comment:
+6. **Post to PR**: If the review is for a PR (PR number given, or the current branch has an open PR), post the review:
    - **Extract repo** if not already done in step 1 (SSH aliases prevent `gh` auto-detection):
      ```bash
      repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/]+)$|\1|')
      ```
    - Detect open PR: `gh pr view --json number -q .number -R "$repo" 2>/dev/null`
-   - Post comment: `gh pr comment <number> -R "$repo" --body "<review>"` (use a HEREDOC for the body)
+   - Get PR head SHA: `gh pr view <number> -R "$repo" --json headRefOid -q .headRefOid`
+   - **Approve or request changes** → post a formal review via the wrapper:
+     ```bash
+     ./scripts/hooks/gh-review.sh --repo "$repo" --pr <number> \
+       --event APPROVE --body "<review>" --commit-id <head_sha>
+     ```
+     (use `--event REQUEST_CHANGES` for request-changes verdicts)
+   - **Comment only** (no verdict) → `gh pr comment <number> -R "$repo" --body "<review>"` (use a HEREDOC for the body)
    - If no PR is associated or no remote is configured, just output the review to the terminal
 
 ## Rules
