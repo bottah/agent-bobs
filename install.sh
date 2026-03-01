@@ -16,7 +16,7 @@ fi
 
 TARGET="$(cd "$TARGET" && pwd)"
 
-echo "Installing agent-teams template into: $TARGET"
+echo "Installing agent-bobs template into: $TARGET"
 
 # Repo infrastructure and runtime artifacts
 exclude=(
