@@ -35,6 +35,7 @@ exclude=(
 customize_once=(
   README.md
   CHANGELOG.md
+  CLAUDE.md
   .github/workflows/ci.yml
   .github/ruleset.json
 )
