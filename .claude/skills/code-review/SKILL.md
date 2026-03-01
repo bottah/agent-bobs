@@ -277,15 +277,22 @@ When re-invoked with a bead ID or on an existing branch, detect existing state a
 - If the review bead is `closed` → skip to step 8 (merge)
 - If the review bead is `blocked` and cycle limit not reached → resume fix cycle in step 7
 
-On resume, reload all workflow state from the highest-cycle review bead for the feature:
+On resume, first recover the PR number from the current branch (covers the case where the PR exists but no review bead has been created yet):
 ```bash
-# Find the active review bead (highest cycle) for this feature bead
+pr_number=$(gh pr view -R "$repo" --json number -q .number 2>/dev/null)
+head_ref=$(git branch --show-current)
+```
+
+Then, if a review bead exists, reload cycle state from the highest-cycle review bead:
+```bash
 review_bead=$(bd list --json | jq -r "[.[] | select(.type == \"review\" and .metadata.feature_bead == \"<feature_bead_id>\")] | sort_by(.metadata.cycle) | last")
-review_bead_id=$(echo "$review_bead" | jq -r '.id')
-cycle=$(echo "$review_bead" | jq -r '.metadata.cycle')
-pr_number=$(echo "$review_bead" | jq -r '.metadata.pr')
-base_ref=$(echo "$review_bead" | jq -r '.metadata.base_ref')
-head_ref=$(echo "$review_bead" | jq -r '.metadata.head_ref')
+if [ "$review_bead" != "null" ] && [ -n "$review_bead" ]; then
+  review_bead_id=$(echo "$review_bead" | jq -r '.id')
+  cycle=$(echo "$review_bead" | jq -r '.metadata.cycle')
+  pr_number=$(echo "$review_bead" | jq -r '.metadata.pr')
+  base_ref=$(echo "$review_bead" | jq -r '.metadata.base_ref')
+  head_ref=$(echo "$review_bead" | jq -r '.metadata.head_ref')
+fi
 ```
 
 Check for existing state at each step before creating new artifacts.
