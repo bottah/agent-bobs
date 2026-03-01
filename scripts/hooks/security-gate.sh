@@ -49,14 +49,12 @@ dangerous_regex=(
   'curl\s+.*\|\s*(sh|bash|zsh)'
   'wget\s+.*\|\s*(sh|bash|zsh)'
   # Block commands that expose secrets via environment variables
-  # Matches exact names and suffix patterns: *_TOKEN, *_SECRET, *_API_KEY, *_KEY, *_PASSWORD
-  'echo\s+.*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
-  'printf\s+.*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
+  # Requires unquoted $ (actual expansion), not quoted mentions in strings
+  '(^|&&|;|\|)\s*(echo|printf)\s+[^"'"'"']*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
   # Block printenv with a specific secret variable name
-  'printenv\s+[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
-  # Block environment dump commands (standalone or piped)
-  '(^|&&|;|\|)\s*env(\s*$|\s*\||\s*;|\s*&&)'
-  '(^|&&|;|\|)\s*printenv(\s*$|\s*\||\s*;|\s*&&)'
+  '(^|&&|;|\|)\s*(\/usr\/bin\/)?printenv\s+[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
+  # Block environment dump commands (standalone or piped), including absolute paths
+  '(^|&&|;|\|)\s*(\/usr\/bin\/)?(env|printenv)(\s*$|\s*\||\s*;|\s*&&)'
   '(^|&&|;|\|)\s*set(\s*$|\s*\||\s*;|\s*&&)'
 )
 
