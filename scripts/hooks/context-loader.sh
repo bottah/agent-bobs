@@ -44,14 +44,14 @@ fi
 
 # Beads status (if bd CLI is available)
 if command -v bd &>/dev/null; then
-  # Active review beads (open or in_progress)
-  active_reviews=$(bd list --json 2>/dev/null | jq -r '[.[] | select(.type == "review" and (.status == "open" or .status == "in_progress"))] | length' 2>/dev/null)
+  # Active review beads (open or in_progress) — identified by type:review label
+  active_reviews=$(bd list --json 2>/dev/null | jq -r '[.[] | select((.labels // [] | index("type:review")) and (.status == "open" or .status == "in_progress"))] | length' 2>/dev/null)
   if [ -n "$active_reviews" ] && [ "$active_reviews" -gt 0 ]; then
-    review_details=$(bd list --json 2>/dev/null | jq -r '[.[] | select(.type == "review" and (.status == "open" or .status == "in_progress"))] | .[] | "  \(.id): \(.title) [cycle \(.metadata.cycle // "?"), reviewer: \(.metadata.reviewer // "?"), status: \(.status)]"' 2>/dev/null)
+    review_details=$(bd list --json 2>/dev/null | jq -r '[.[] | select((.labels // [] | index("type:review")) and (.status == "open" or .status == "in_progress"))] | .[] | "  \(.id): \(.title) [cycle \(.metadata.cycle // "?"), reviewer: \(.metadata.reviewer // "?"), status: \(.status)]"' 2>/dev/null)
     context+="Active review beads ($active_reviews):\n$review_details\n"
   fi
   # In-progress feature beads
-  feature_count=$(bd list --json 2>/dev/null | jq -r '[.[] | select(.type == "feature" and .status == "in_progress")] | length' 2>/dev/null)
+  feature_count=$(bd list --json 2>/dev/null | jq -r '[.[] | select(.issue_type == "feature" and .status == "in_progress")] | length' 2>/dev/null)
   if [ -n "$feature_count" ] && [ "$feature_count" -gt 0 ]; then
     context+="In-progress feature beads: $feature_count\n"
   fi
