@@ -72,11 +72,13 @@ jobs:
     steps:
       - name: Check required jobs
         run: |
-          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]] || \
-             [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "::error::One or more required jobs failed or were cancelled"
-            exit 1
-          fi
+          results="${{ join(needs.*.result, ' ') }}"
+          for r in $results; do
+            if [[ "$r" != "success" ]]; then
+              echo "::error::Required job returned '$r' — expected 'success'"
+              exit 1
+            fi
+          done
           echo "All required checks passed"
 
   # ─── Build (merge to main only) ─────────────────────────────────────
