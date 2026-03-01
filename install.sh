@@ -24,6 +24,10 @@ exclude=(
   --exclude='install.sh'
   --exclude='.claude/audit.log'
   --exclude='.claude/settings.local.json'
+  --exclude='.claude/last-session.json'
+  --exclude='.claude/subagent.log'
+  --exclude='.claude/transcript-backups'
+  --exclude='docs/handoff-*.md'
 )
 
 # rsync preserves directory structure, only copies what changed
