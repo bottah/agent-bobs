@@ -280,6 +280,7 @@ v2 enforces schema rules on `code-review-workflow.yml`:
 reviewers:                          # At least one reviewer must be defined
   <id>:                             # Reviewer ID — must match label `reviewer:<id>`
     focus: "<string>"               # Description of review focus area
+    github_login: "<string>"        # GitHub username for formal reviews via gh-review.sh
 
 # --- Optional (with defaults) ---
 limits:
@@ -299,6 +300,7 @@ on_limit_reached:
 - `reviewers` must contain at least one entry.
 - Each reviewer `<id>` must be a valid label-safe string (alphanumeric, hyphens, underscores).
 - `focus` is required for each reviewer.
+- `github_login` is required for each reviewer (used by `gh-review.sh` for identity validation).
 - All `limits` fields are optional; defaults apply if omitted.
 - Range checks applied to numeric fields.
 - Unknown keys are ignored (forward-compatible).
@@ -369,13 +371,13 @@ loop forever:
 
   # 8. Post verdict to GitHub + update bead
   if verdict is APPROVE:
-    gh api repos/<repo>/pulls/<pr>/reviews \
-      -f event=APPROVE -f body=<review_body> -f commit_id=<head_sha>
+    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
+      --event APPROVE --body <review_body> --commit-id <head_sha>
     bd close <bead_id> --reason "Approved at <head_sha>" --json
 
   if verdict is REQUEST_CHANGES:
-    gh api repos/<repo>/pulls/<pr>/reviews \
-      -f event=REQUEST_CHANGES -f body=<review_body> -f commit_id=<head_sha>
+    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
+      --event REQUEST_CHANGES --body <review_body> --commit-id <head_sha>
     bd update <bead_id> --status blocked \
       --append-notes "REQUEST_CHANGES: <review_body>" --json
 ```
