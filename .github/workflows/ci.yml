@@ -62,6 +62,23 @@ jobs:
   #     - name: Run smoke tests
   #       run: echo "TODO - configure smoke tests"
 
+  # ─── Governance gate ─────────────────────────────────────────────────
+  # Single required check for branch protection. Add new jobs to `needs:`
+  # instead of updating ruleset.json.
+  governance:
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [lint, unit-tests]
+    steps:
+      - name: Check required jobs
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]] || \
+             [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "::error::One or more required jobs failed or were cancelled"
+            exit 1
+          fi
+          echo "All required checks passed"
+
   # ─── Build (merge to main only) ─────────────────────────────────────
   build:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
