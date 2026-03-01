@@ -19,7 +19,11 @@ The user may provide:
 ## Steps
 
 1. Determine the scope of review:
-   - If a PR number is given: `gh pr diff <number> -R "$repo"` (extract repo first — see below)
+   - If a PR number is given: extract repo first, then fetch the diff:
+     ```bash
+     repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/]+)$|\1|')
+     gh pr diff <number> -R "$repo"
+     ```
    - If a git range is given: `git diff <range>`
    - If a file/glob is given: read those files
    - If nothing: `git diff` (staged + unstaged)
@@ -50,7 +54,7 @@ The user may provide:
 ```
 
 6. **Post to PR**: If the review is for a PR (PR number given, or the current branch has an open PR), post the review as a PR comment:
-   - **Extract repo first** (SSH aliases prevent `gh` auto-detection):
+   - **Extract repo** if not already done in step 1 (SSH aliases prevent `gh` auto-detection):
      ```bash
      repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/]+)$|\1|')
      ```
