@@ -54,9 +54,9 @@ dangerous_regex=(
   # regex cannot reliably parse shell quoting (nested quotes, heredocs, escapes), so we
   # err toward false positives. A blocked command can be manually approved; a leaked
   # secret cannot be unleaked.
-  '(^|&&|;|\|)\s*(echo|printf)\s+.*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
-  # Block printenv with a specific secret variable name
-  '(^|&&|;|\|)\s*(\/usr\/bin\/)?printenv\s+[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
+  '(^|&&|;|\|)\s*(\/[a-z/]*\/)?(echo|printf)\s+.*\$\{?[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
+  # Block printenv with a specific secret variable name (including command prefix and absolute paths)
+  '(^|&&|;|\|)\s*(command\s+)?(\/[a-z/]*\/)?printenv\s+[A-Za-z0-9_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
   # Block environment dump commands, including absolute paths
   # Bare env/printenv, or with dump flags (-0, --null). Allows env VAR=val cmd (process launch).
   '(^|&&|;|\|)\s*(\/usr\/bin\/)?(env|printenv)\s*(\s*$|\s*\||\s*;|\s*&&)'
