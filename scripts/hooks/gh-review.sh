@@ -65,7 +65,7 @@ fi
 # --- Get reviewer token ---
 REVIEWER_TOKEN=$(gh auth token -u "$REVIEWER_GH_USER" 2>/dev/null) || true
 if [[ -z "$REVIEWER_TOKEN" ]]; then
-  echo "gh-review.sh: no token found for user '$REVIEWER_GH_USER'. Run: gh auth login -u $REVIEWER_GH_USER" >&2
+  echo "gh-review.sh: no token found for user '$REVIEWER_GH_USER'. Add the account with: gh auth login (select $REVIEWER_GH_USER when prompted)" >&2
   exit 1
 fi
 

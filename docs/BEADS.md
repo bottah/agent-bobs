@@ -97,7 +97,7 @@ loop forever:
       --append-notes "REQUEST_CHANGES: <review_body>"
 ```
 
-**Reviewer requirements**: `bd` CLI, `gh` CLI with `talosaether` auth context (`gh auth login -u talosaether`), repo read access, review write access, no merge permission.
+**Reviewer requirements**: `bd` CLI, `gh` CLI with `talosaether` auth context (`gh auth login`, then select the `talosaether` account), repo read access, review write access, no merge permission.
 
 ## Observability
 
