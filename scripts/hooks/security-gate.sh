@@ -48,6 +48,14 @@ dangerous_regex=(
   # curl/wget piped to shell — remote code execution
   'curl\s+.*\|\s*(sh|bash|zsh)'
   'wget\s+.*\|\s*(sh|bash|zsh)'
+  # Block commands that expose secrets via environment variables
+  'echo\s+.*\$(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
+  'echo\s+.*\$\{(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
+  'printf\s+.*\$(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
+  'printf\s+.*\$\{(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
+  'env\s*$'
+  'printenv\s*$'
+  'set\s*$'
 )
 
 for pattern in "${dangerous_regex[@]}"; do
