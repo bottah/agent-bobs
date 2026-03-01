@@ -50,7 +50,7 @@ The user may provide:
 ```
 
 6. **Post to PR**: If the review is for a PR (PR number given, or the current branch has an open PR), post the review as a PR comment:
-   - Auto-detect repo: `repo=$(git remote get-url origin | sed -E 's|.*[:/]([^/]+/[^/.]+)(\.git)?$|\1|')`
+   - Auto-detect repo: `repo=$(git remote get-url origin | sed -E 's|(\.git)$||; s|.*[:/]([^/]+/[^/]+)$|\1|')`
    - Detect open PR: `gh pr view --json number -q .number -R "$repo" 2>/dev/null`
    - Post comment: `gh pr comment <number> -R "$repo" --body "<review>"` (use a HEREDOC for the body)
    - If no PR is associated, just output the review to the terminal
