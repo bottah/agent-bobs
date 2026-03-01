@@ -62,6 +62,16 @@ if [ "$tool_name" = "Bash" ] && [ -n "$command" ]; then
         ;;
       esac
       ;;
+    bd)
+      # Only allow read-only bd (beads) subcommands
+      bd_subcmd=$(echo "$command" | sed 's/^bd //' | awk '{print $1}')
+      case "$bd_subcmd" in
+        ready|show|list)
+          echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
+          exit 0
+        ;;
+      esac
+      ;;
   esac
 fi
 

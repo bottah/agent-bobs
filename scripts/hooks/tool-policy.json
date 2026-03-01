@@ -19,6 +19,11 @@
       "match": "^gh pr merge.*--admin",
       "mode": "regex",
       "message": "The --admin flag bypasses all branch protection rules. If status checks are pending, wait for them to complete. If checks are failing, fix the underlying issue."
+    },
+    {
+      "match": "^gh pr merge(?!.*--squash)",
+      "mode": "pcre",
+      "message": "Use --squash flag for PR merges to maintain linear history."
     }
   ]
 }

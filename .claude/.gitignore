@@ -3,4 +3,5 @@ audit.log
 subagent.log
 last-session.json
 settings.local.json
+beads-audit.log
 transcript-backups/
