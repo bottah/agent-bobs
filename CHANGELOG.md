@@ -20,8 +20,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - `tool-policy.json` rules blocking direct push to main/master and `--admin` bypass on `gh pr merge`
 - Governance gate job in CI — single required check that aggregates all upstream jobs, decoupling CI additions from `ruleset.json` (#20)
 - `customize_once` mechanism in `install.sh` — skip project-specific files (`README.md`, `CHANGELOG.md`, `CLAUDE.md`, `ci.yml`, `ruleset.json`) on re-install (#23, #27, #32)
+- `/code-review` skill for beads-coordinated cross-platform code review workflow
+- `beads-logger.sh` PostToolUse hook for `bd` command audit trail
+- `.claude/code-review-workflow.yml` default config for reviewer, limits, and on-limit behavior
+- `docs/BEADS.md` setup guide with configuration reference, reviewer interface, and troubleshooting
+- Auto-allow for `bd` read commands (`ready`, `show`, `list`) in `auto-allow-reads.sh`
+- Beads status display (active reviews, in-progress features) in `context-loader.sh` session start
+- `pcre` mode for `tool-policy.sh` enabling negative lookahead patterns
+- Merge-gate rule in `tool-policy.json` requiring `--squash` on `gh pr merge`
 
 ### Changed
+
+- `install.sh` excludes `.beads` directory, adds `code-review-workflow.yml` to customize_once, optionally runs `bd init`
 
 - Enhanced `/commit` skill with branch guard (refuses commit on main/master)
 - Enhanced `/pr` skill with branch guard, rebase freshness check, SSH alias workaround, and self-review suggestion
