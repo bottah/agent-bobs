@@ -49,13 +49,13 @@ dangerous_regex=(
   'curl\s+.*\|\s*(sh|bash|zsh)'
   'wget\s+.*\|\s*(sh|bash|zsh)'
   # Block commands that expose secrets via environment variables
-  'echo\s+.*\$(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
-  'echo\s+.*\$\{(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
-  'printf\s+.*\$(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
-  'printf\s+.*\$\{(GH_TOKEN|GITHUB_TOKEN|ANTHROPIC_API_KEY|OPENAI_API_KEY|API_KEY|SECRET|TOKEN)'
-  'env\s*$'
-  'printenv\s*$'
-  'set\s*$'
+  # Matches exact names and suffix patterns: *_TOKEN, *_SECRET, *_API_KEY, *_KEY, *_PASSWORD
+  'echo\s+.*\$\{?[A-Za-z_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
+  'printf\s+.*\$\{?[A-Za-z_]*(_TOKEN|_SECRET|_API_KEY|_KEY|_PASSWORD)\b'
+  # Block environment dump commands (standalone or piped)
+  '(^|&&|;|\|)\s*env(\s*$|\s*\||\s*;|\s*&&)'
+  '(^|&&|;|\|)\s*printenv(\s*$|\s*\||\s*;|\s*&&)'
+  '(^|&&|;|\|)\s*set(\s*$|\s*\||\s*;|\s*&&)'
 )
 
 for pattern in "${dangerous_regex[@]}"; do
