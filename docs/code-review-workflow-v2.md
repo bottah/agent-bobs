@@ -369,13 +369,13 @@ loop forever:
 
   # 8. Post verdict to GitHub + update bead
   if verdict is APPROVE:
-    gh api repos/<repo>/pulls/<pr>/reviews \
-      -f event=APPROVE -f body=<review_body> -f commit_id=<head_sha>
+    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
+      --event APPROVE --body <review_body> --commit-id <head_sha>
     bd close <bead_id> --reason "Approved at <head_sha>" --json
 
   if verdict is REQUEST_CHANGES:
-    gh api repos/<repo>/pulls/<pr>/reviews \
-      -f event=REQUEST_CHANGES -f body=<review_body> -f commit_id=<head_sha>
+    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
+      --event REQUEST_CHANGES --body <review_body> --commit-id <head_sha>
     bd update <bead_id> --status blocked \
       --append-notes "REQUEST_CHANGES: <review_body>" --json
 ```
