@@ -29,6 +29,7 @@ exclude=(
   --exclude='.claude/transcript-backups'
   --exclude='docs/handoff-*.md'
   --exclude='.beads'
+  --exclude='.claude/beads-audit.log'
 )
 
 # Project-specific files that are customized after initial install.

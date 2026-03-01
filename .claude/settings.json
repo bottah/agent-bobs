@@ -18,7 +18,6 @@
       "Bash(npx *)",
       "Bash(source *)",
       "Bash(claude *)",
-      "Bash(bd *)",
       "Task(Explore)",
       "Task(Plan)",
       "Task(general-purpose)"
