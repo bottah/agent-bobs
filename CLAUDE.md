@@ -25,6 +25,7 @@ Boilerplate for multi-agent orchestration in Claude Code. Four layers: **agents*
 | `/protect` | main | Configure GitHub branch protection rulesets |
 | `/loop` | main | Iterative fix-and-check until a condition is met |
 | `/handoff` | main | Generate session handoff document |
+| `/code-review` | main | Beads-coordinated code review workflow |
 
 ## Team Templates
 
@@ -88,8 +89,21 @@ Hooks are shell scripts that fire at lifecycle events, enforcing rules that agen
 | `post-edit-lint.sh` | PostToolUse → Edit\|Write | Template | Run linter, feed errors to Claude |
 | `affected-tests.sh` | PostToolUse → Edit\|Write | Template | Run related tests, feed failures to Claude |
 | `context-loader.sh` | SessionStart | Template | Inject git status and recent commits |
+| `beads-logger.sh` | PostToolUse → Bash | Template | Beads-specific audit trail |
 
 See `docs/HOOKS.md` for configuration, customization, and gotchas.
+
+## Code Review Workflow
+
+Cross-platform code review using beads for coordination. Claude implements features, an external reviewer (e.g., Codex) reviews PRs, and GitHub hosts review artifacts.
+
+**Quick start**: `/code-review #42` (from issue) or `/code-review "add user search"` (from description)
+
+**Requirements**: `bd` CLI, `gh` CLI (authenticated), beads database (`bd init`)
+
+**Flow**: resolve issue → branch → implement → PR → review bead → poll for verdict → fix if needed → merge on approval
+
+See `docs/BEADS.md` for full setup guide, configuration reference, and troubleshooting.
 
 ## Constraints
 
