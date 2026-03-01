@@ -1,0 +1,19 @@
+# .claude/code-review-workflow.yml
+#
+# Cross-platform code review workflow.
+# Claude implements. External reviewer reviews. Beads coordinates.
+#
+# v1 uses only the first reviewer listed below.
+# Additional entries are accepted but ignored until v2.
+
+reviewers:
+  codex:
+    focus: "security, correctness, edge cases, error handling"
+
+limits:
+  max_review_cycles: 3          # max fix/re-review loops before flagging
+  poll_interval_seconds: 60     # how often Claude checks review status
+  max_wait_minutes: 30          # max time Claude waits before pausing
+
+on_limit_reached:
+  pr_label: "needs-human-review"
