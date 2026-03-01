@@ -18,7 +18,7 @@ TARGET="$(cd "$TARGET" && pwd)"
 
 echo "Installing agent-teams template into: $TARGET"
 
-# Everything except repo infrastructure and runtime artifacts
+# Repo infrastructure and runtime artifacts
 exclude=(
   --exclude='.git'
   --exclude='install.sh'
@@ -29,6 +29,21 @@ exclude=(
   --exclude='.claude/transcript-backups'
   --exclude='docs/handoff-*.md'
 )
+
+# Project-specific files that are customized after initial install.
+# Only copy these if they don't already exist in the target.
+customize_once=(
+  README.md
+  CHANGELOG.md
+  .github/workflows/ci.yml
+  .github/ruleset.json
+)
+
+for f in "${customize_once[@]}"; do
+  if [[ -e "$TARGET/$f" ]]; then
+    exclude+=(--exclude="$f")
+  fi
+done
 
 # rsync preserves directory structure, only copies what changed
 rsync -a "${exclude[@]}" "$SCRIPT_DIR/" "$TARGET/"
