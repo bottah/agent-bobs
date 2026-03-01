@@ -30,7 +30,7 @@ if [ "$tool_name" = "Bash" ] && [ -n "$command" ]; then
 
   # Safe read-only commands
   case "$base_cmd" in
-    ls|cat|head|tail|wc|file|which|whoami|pwd|date|uname|env|printenv)
+    ls|cat|head|tail|wc|file|which|whoami|pwd|date|uname)
       echo '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
       exit 0
       ;;
