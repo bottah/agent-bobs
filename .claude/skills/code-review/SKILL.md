@@ -130,12 +130,13 @@ head_sha=$(git rev-parse HEAD)
 base_ref=$(gh pr view <pr_number> -R "$repo" --json baseRefName -q .baseRefName)
 head_ref=$(git branch --show-current)
 
-bd create \
+review_bead_id=$(bd create \
   --title "Review PR #<pr_number> [$reviewer]" \
   --type review \
   --label "reviewer:$reviewer" \
   --set-metadata "{\"pr\": <pr_number>, \"repo\": \"$repo\", \"head_sha\": \"$head_sha\", \"base_ref\": \"$base_ref\", \"head_ref\": \"$head_ref\", \"reviewer\": \"$reviewer\", \"cycle\": 1, \"feature_bead\": \"<feature_bead_id>\"}" \
-  --json
+  --json | jq -r '.id')
+cycle=1
 ```
 
 ### 6. Post GitHub event comment
@@ -156,8 +157,8 @@ Poll the review bead status until resolution or timeout:
 
 ```bash
 start_time=$(date +%s)
-cycle=1  # current cycle number
-# review_bead_id is set from step 5 (the bead created there)
+# review_bead_id and cycle are set from step 5, or reloaded from
+# bead metadata when resuming (see Resumability section below).
 
 while true; do
   sleep $poll_interval_seconds
@@ -167,8 +168,8 @@ while true; do
   if [ $elapsed -ge $(( max_wait_minutes * 60 )) ]; then
     echo "Timeout: waited ${max_wait_minutes} minutes with no review resolution."
     echo "Resume with: /code-review <feature-bead-id>"
-    # Do NOT modify any bead state on timeout
-    break
+    # Do NOT modify any bead state on timeout — stop the workflow entirely
+    exit 0
   fi
 
   # Check review bead status (always poll the current cycle's bead)
@@ -275,6 +276,14 @@ When re-invoked with a bead ID or on an existing branch, detect existing state a
 - If a review bead already exists for the current cycle → skip to step 7 (poll)
 - If the review bead is `closed` → skip to step 8 (merge)
 - If the review bead is `blocked` and cycle limit not reached → resume fix cycle in step 7
+
+On resume, reload `review_bead_id` and `cycle` from the highest-cycle review bead for the feature:
+```bash
+# Find the active review bead (highest cycle) for this feature bead
+review_bead=$(bd list --json | jq -r "[.[] | select(.type == \"review\" and .metadata.feature_bead == \"<feature_bead_id>\")] | sort_by(.metadata.cycle) | last")
+review_bead_id=$(echo "$review_bead" | jq -r '.id')
+cycle=$(echo "$review_bead" | jq -r '.metadata.cycle')
+```
 
 Check for existing state at each step before creating new artifacts.
 
