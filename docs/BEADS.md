@@ -148,4 +148,4 @@ Claude waited `max_wait_minutes` without a review verdict. No bead state is modi
 
 ### Beads database not initialized
 
-Run `bd init` in your project root, or re-run `install.sh` which will initialize it automatically if `bd` is available.
+Run `bd init --stealth` in your project root, or re-run `install.sh` which will initialize it automatically if `bd` is available. The `--stealth` flag prevents beads files from being tracked by git, avoiding artifact pollution in PRs.

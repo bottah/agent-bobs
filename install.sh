@@ -58,7 +58,7 @@ chmod +x "$TARGET"/scripts/hooks/*.sh 2>/dev/null || true
 # Initialize beads database if bd CLI is available and not already initialized
 if command -v bd &>/dev/null && [ ! -d "$TARGET/.beads" ]; then
   echo "Initializing beads database..."
-  (cd "$TARGET" && bd init) || true
+  (cd "$TARGET" && bd init --stealth) || true
 fi
 
 echo "Done."
