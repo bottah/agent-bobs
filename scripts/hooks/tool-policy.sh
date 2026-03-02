@@ -19,11 +19,18 @@ if [ -z "$command" ]; then
   exit 0
 fi
 
+# Fail closed on env-var prefixes we cannot safely normalize (command
+# substitution via $(...) or backticks). Block rather than mis-parse.
+if echo "$command" | grep -qE '^[[:space:]]*([A-Za-z_][A-Za-z_0-9]*=("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]]*)[[:space:]]+)*[A-Za-z_][A-Za-z_0-9]*=\$\(' \
+  || echo "$command" | grep -qE '^[[:space:]]*([A-Za-z_][A-Za-z_0-9]*=("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]]*)[[:space:]]+)*[A-Za-z_][A-Za-z_0-9]*=`'; then
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool policy: complex env-var prefixes are blocked; remove the prefix or use a wrapper script."}}'
+  exit 0
+fi
+
 # Normalize: strip leading env var assignments (e.g., NO_COLOR=1 FOO="a b" ...)
 # so anchored rules can't be bypassed by prefixing KEY=val before the command.
 # Handles unquoted, double-quoted, and single-quoted values with space/tab
-# delimiters. Does not handle command substitution in values (e.g., KEY=$(cmd))
-# which is not a realistic vector from Claude Code's JSON input.
+# delimiters.
 command=$(echo "$command" | sed -E $'s/^([A-Za-z_][A-Za-z_0-9]*=("[^"]*"|\'[^\']*\'|[^[:space:]]*)[[:space:]]+)*//')
 
 # Read each rule from the policy file
