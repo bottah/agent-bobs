@@ -231,8 +231,13 @@ split_command_segments() {
       '&')
         if (( sd == 0 )); then
           if (( i + 1 < len )) && [[ ${s:i+1:1} == '&' ]]; then
+            # && — logical AND separator
             printf '%s\n' "${s:start:i-start}"
             ((i += 2)); start=$i; continue
+          elif (( i + 1 < len )) && [[ ${s:i+1:1} == '>' ]]; then
+            : # &> or &>> redirect operator, not a separator
+          elif (( i > start )) && [[ ${s:i-1:1} == '>' || ${s:i-1:1} == '<' ]]; then
+            : # >& or <& redirect operator, not a separator
           else
             # Single & (background operator) — also a separator
             printf '%s\n' "${s:start:i-start}"
@@ -397,6 +402,24 @@ while [ "$i" -lt "$rule_count" ]; do
           'time '*) seg="${seg#time }" ;;
           ' '*|$'\t'*) seg="${seg#?}" ;; *) break ;;
         esac
+      done
+      # Strip leading I/O redirections (>file, 2>file, &>file, etc.)
+      # In Bash, redirections can appear before the command word.
+      _redir_re='^([0-9]*&?[<>]{1,3})[[:space:]]*'
+      _proc_re='^[0-9]*[<>]\([^<>]'
+      while [[ "$seg" =~ $_redir_re ]]; do
+        # Don't strip process substitution <( or >(
+        [[ "$seg" =~ $_proc_re ]] && break
+        seg="${seg:${#BASH_REMATCH[0]}}"
+        # Strip the target word (respecting quotes)
+        case "${seg:0:1}" in
+          "'") seg="${seg:1}"; seg="${seg#*\'}" ;;
+          '"') seg="${seg:1}"; seg="${seg#*\"}" ;;
+          '') break ;;
+          *) seg="${seg#*[[:space:]]}" ;;
+        esac
+        # Trim whitespace before next iteration
+        seg="${seg#"${seg%%[![:space:]]*}"}"
       done
       # Strip trailing grouping syntax, semicolons, and whitespace
       while true; do
