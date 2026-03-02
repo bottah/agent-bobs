@@ -44,11 +44,12 @@ normalize_command_prefix() {
     esc=0
     local has_cmd_subst=0
     local arith_depth=0
+    local brace_depth=0
 
     # Read one shell-ish token, honoring quotes and backslash escapes well
     # enough to find token boundaries without evaluating anything.
     # Track unescaped $( and backticks to detect command substitution.
-    # Track $(( depth so spaces inside arithmetic don't break the token.
+    # Track $(( and ${ depth so spaces inside expansions don't break the token.
     while (( i < len )); do
       c=${s:i:1}
 
@@ -84,24 +85,32 @@ normalize_command_prefix() {
 
       case "$c" in
         ' ' | $'\t')
-          # Don't break inside arithmetic expansion — spaces are valid there
-          if (( arith_depth > 0 )); then :; else break; fi ;;
+          # Don't break inside expansions — spaces are valid there
+          if (( arith_depth > 0 || brace_depth > 0 )); then :; else break; fi ;;
         \\) esc=1 ;;
         "'") in_s=1 ;;
         '"') in_d=1 ;;
-        '$') # Check for $( outside quotes (unescaped)
-          if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-            if (( i + 2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
-              # $(( = arithmetic expansion — track depth, skip past $((
-              arith_depth=1
-              ((i += 2))
-            else
-              # $( = command substitution
-              has_cmd_subst=1
-            fi
+        '$') # Check for $(, $((, or ${ outside quotes (unescaped)
+          if (( i + 1 < len )); then
+            case "${s:i+1:1}" in
+              '(')
+                if (( i + 2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
+                  # $(( = arithmetic expansion — track depth, skip past $((
+                  arith_depth=1
+                  ((i += 2))
+                else
+                  # $( = command substitution
+                  has_cmd_subst=1
+                fi ;;
+              '{')
+                # ${ = parameter expansion — track brace depth
+                ((brace_depth++))
+                ((i++)) ;;
+            esac
           fi ;;
         '(') (( arith_depth > 0 )) && ((arith_depth++)) ;;
         ')') (( arith_depth > 0 )) && ((arith_depth--)) ;;
+        '}') (( brace_depth > 0 )) && ((brace_depth--)) ;;
         '`') has_cmd_subst=1 ;;
       esac
       ((i++))
