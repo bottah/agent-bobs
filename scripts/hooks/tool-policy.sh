@@ -42,9 +42,11 @@ normalize_command_prefix() {
     in_s=0
     in_d=0
     esc=0
+    local has_cmd_subst=0
 
     # Read one shell-ish token, honoring quotes and backslash escapes well
     # enough to find token boundaries without evaluating anything.
+    # Track unescaped $( and backticks to detect command substitution.
     while (( i < len )); do
       c=${s:i:1}
 
@@ -55,6 +57,7 @@ normalize_command_prefix() {
       fi
 
       if (( in_s )); then
+        # Single quotes: everything is literal, no cmd subst possible
         [[ $c == "'" ]] && in_s=0
         ((i++))
         continue
@@ -64,6 +67,11 @@ normalize_command_prefix() {
         case "$c" in
           \\) esc=1 ;;
           '"') in_d=0 ;;
+          '$') # Check for $( inside double quotes (unescaped)
+            if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+              has_cmd_subst=1
+            fi ;;
+          '`') has_cmd_subst=1 ;;
         esac
         ((i++))
         continue
@@ -74,6 +82,11 @@ normalize_command_prefix() {
         \\) esc=1 ;;
         "'") in_s=1 ;;
         '"') in_d=1 ;;
+        '$') # Check for $( outside quotes (unescaped)
+          if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+            has_cmd_subst=1
+          fi ;;
+        '`') has_cmd_subst=1 ;;
       esac
       ((i++))
     done
@@ -86,13 +99,9 @@ normalize_command_prefix() {
       return 0
     fi
 
-    value=${token#*=}
-
-    # The tokenizer above already walked quotes and escapes to find the
-    # correct token boundary. Reject only values with command substitution
-    # ($() or backticks) which could execute arbitrary code. Single-quoted
-    # values are always literal — $() and backticks are not evaluated.
-    if [[ $value != \'* ]] && { [[ $value == *'$('* ]] || [[ $value == *'`'* ]]; }; then
+    # Reject values with unescaped command substitution ($() or backticks).
+    # Detected during tokenization with full escape/quote context.
+    if (( has_cmd_subst )); then
       return 1
     fi
 
