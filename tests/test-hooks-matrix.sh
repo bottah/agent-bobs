@@ -164,6 +164,8 @@ executable_wrappers=(
   'time %s'
   'command %s'
   'exec %s'
+  'env NO_COLOR=1 %s'
+  'env %s'
   '>/tmp/x %s'
   '2>/tmp/x %s'
   '>/tmp/x 2>&1 %s'

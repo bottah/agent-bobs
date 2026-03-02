@@ -401,8 +401,27 @@ while [ "$i" -lt "$rule_count" ]; do
           'do '*) seg="${seg#do }" ;; '! '*) seg="${seg#! }" ;;
           'time '*) seg="${seg#time }" ;;
           'command '*) seg="${seg#command }" ;; 'exec '*) seg="${seg#exec }" ;;
+          'env '*) seg="${seg#env }" ;;
           ' '*|$'\t'*) seg="${seg#?}" ;; *) break ;;
         esac
+      done
+      # Strip env-var assignment prefixes (NAME=value) from segment.
+      # Handles assignments left over after 'env' keyword stripping and
+      # assignments that appear in extracted substitution content.
+      while [[ "$seg" =~ ^[A-Za-z_][A-Za-z_0-9]*\+?= ]]; do
+        _env_rest="${seg#*=}"
+        case "${_env_rest:0:1}" in
+          "'") _env_rest="${_env_rest:1}"; _env_rest="${_env_rest#*\'}" ;;
+          '"') _env_rest="${_env_rest:1}"; _env_rest="${_env_rest#*\"}" ;;
+          *)   # Unquoted: skip to next whitespace
+               _env_nows="${_env_rest%%[[:space:]]*}"
+               [[ "$_env_nows" == "$_env_rest" ]] && break  # No space found — not a prefix
+               _env_rest="${_env_rest#"$_env_nows"}" ;;
+        esac
+        # Trim leading whitespace for next iteration
+        _env_rest="${_env_rest#"${_env_rest%%[![:space:]]*}"}"
+        [[ -z "$_env_rest" ]] && break  # Nothing left after assignment
+        seg="$_env_rest"
       done
       # Strip leading I/O redirections (>file, 2>file, &>file, etc.)
       # In Bash, redirections can appear before the command word.
