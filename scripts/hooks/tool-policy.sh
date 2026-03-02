@@ -246,6 +246,16 @@ extract_subst_segments() {
               printf '%s\n' "${s:start:i-start}"
             fi
           fi ;;
+        '<' | '>')
+          # <( and >( = process substitution — extract inner content
+          if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+            ((i += 2)); start=$i; depth=1
+            while (( i < len && depth > 0 )); do
+              case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
+              (( depth > 0 )) && ((i++))
+            done
+            printf '%s\n' "${s:start:i-start}"
+          fi ;;
         '`')
           ((i++)); start=$i
           while (( i < len )) && [[ ${s:i:1} != '`' ]]; do ((i++)); done
