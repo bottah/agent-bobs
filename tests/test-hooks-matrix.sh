@@ -162,6 +162,8 @@ executable_wrappers=(
   'while true; do %s; break; done'
   '! %s'
   'time %s'
+  'command %s'
+  'exec %s'
   '>/tmp/x %s'
   '2>/tmp/x %s'
   '>/tmp/x 2>&1 %s'

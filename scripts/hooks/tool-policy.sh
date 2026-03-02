@@ -400,6 +400,7 @@ while [ "$i" -lt "$rule_count" ]; do
           'then '*) seg="${seg#then }" ;; 'else '*) seg="${seg#else }" ;;
           'do '*) seg="${seg#do }" ;; '! '*) seg="${seg#! }" ;;
           'time '*) seg="${seg#time }" ;;
+          'command '*) seg="${seg#command }" ;; 'exec '*) seg="${seg#exec }" ;;
           ' '*|$'\t'*) seg="${seg#?}" ;; *) break ;;
         esac
       done
