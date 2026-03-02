@@ -355,24 +355,39 @@ extract_shell_exec_arg() {
       inner="${inner#"${inner%%[![:space:]]*}"}" ;;
     env)
       # env [flags] [-S string] [NAME=val]... COMMAND
-      # -S/--split-string takes a command string that env splits and executes.
-      local _rest="${s#env}"
+      # Parse env's flag grammar, then output the remaining command.
+      # -S/--split-string is special: its argument IS the command string.
+      local _rest="${s#env}" _found_S=0
       _rest="${_rest#"${_rest%%[![:space:]]*}"}"
       while [[ "$_rest" == -* ]]; do
         local _flag="${_rest%% *}"
         _rest="${_rest#"$_flag"}"
         _rest="${_rest#"${_rest%%[![:space:]]*}"}"
         case "$_flag" in
-          -S|--split-string)  inner="$_rest"; break ;;
-          -S*)                inner="${_flag#-S}"; break ;;
-          --split-string=*)   inner="${_flag#--split-string=}"; break ;;
+          -S|--split-string)  inner="$_rest"; _found_S=1; break ;;
+          -S*)                inner="${_flag#-S}"; _found_S=1; break ;;
+          --split-string=*)   inner="${_flag#--split-string=}"; _found_S=1; break ;;
+          --)                 break ;;  # end of options
         esac
-        # Skip flag arguments for -u, -C, etc. (next non-flag, non-assignment word)
+        # Skip flag arguments for -u, -C (next non-flag, non-assignment word)
         if [[ -n "$_rest" && "$_rest" != -* && "${_rest%% *}" != *=* ]]; then
           _rest="${_rest#"${_rest%% *}"}"
           _rest="${_rest#"${_rest%%[![:space:]]*}"}"
         fi
-      done ;;
+      done
+      # If no -S, skip NAME=val assignments and output the command portion
+      if (( ! _found_S )); then
+        while [[ "$_rest" =~ ^[A-Za-z_][A-Za-z_0-9]*= ]]; do
+          _rest="${_rest#*=}"
+          case "${_rest:0:1}" in
+            "'") _rest="${_rest:1}"; _rest="${_rest#*\'}" ;;
+            '"') _rest="${_rest:1}"; _rest="${_rest#*\"}" ;;
+            *)   _rest="${_rest#*[[:space:]]}" ;;
+          esac
+          _rest="${_rest#"${_rest%%[![:space:]]*}"}"
+        done
+        [[ -n "$_rest" ]] && inner="$_rest"
+      fi ;;
   esac
 
   if [[ -n "$inner" ]]; then
@@ -432,15 +447,11 @@ while [ "$i" -lt "$rule_count" ]; do
             if [[ "$seg" == *" "* ]] && [[ "$_prefix_words" == *" $_first "* ]]; then
               seg="${seg#"$_first" }"
             elif [[ "$_first" == -* ]] && [[ "$seg" == *" "* ]]; then
-              # Flag (e.g., -i, -u, --verbose): not a command, strip it.
+              # Flag (e.g., -i, --verbose): not a command, strip it.
+              # Don't try to guess flag arguments here — wrappers with
+              # flag-argument grammars (env -u NAME, etc.) are handled
+              # in extract_shell_exec_arg instead.
               seg="${seg#"$_first" }"
-              seg="${seg#"${seg%%[![:space:]]*}"}"
-              # If next word is a bare identifier (no = or - or /), treat
-              # it as a flag argument (e.g., -u TERM) and strip it too.
-              _next="${seg%% *}"
-              if [[ -n "$_next" && "$_next" != -* && "$_next" != *=* && "$_next" != */* && "$seg" == *" "* ]]; then
-                seg="${seg#"$_next" }"
-              fi
             elif [[ "$seg" =~ ^[A-Za-z_][A-Za-z_0-9]*\+?= ]]; then
               # Strip env-var assignment prefix (NAME=value)
               _env_rest="${seg#*=}"
