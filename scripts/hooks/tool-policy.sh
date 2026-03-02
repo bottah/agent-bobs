@@ -19,6 +19,10 @@ if [ -z "$command" ]; then
   exit 0
 fi
 
+# Normalize: strip leading env var assignments (e.g., NO_COLOR=1 GH_TOKEN=x ...)
+# to prevent bypassing anchored regex rules
+command=$(echo "$command" | sed -E 's/^([A-Za-z_][A-Za-z_0-9]*=[^ ]* +)*//')
+
 # Read each rule from the policy file
 # Each rule has: "match" (substring or regex), "message" (what to tell the agent)
 rule_count=$(jq '.rules | length' "$POLICY_FILE" 2>/dev/null)
