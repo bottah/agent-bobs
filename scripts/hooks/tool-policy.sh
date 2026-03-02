@@ -62,7 +62,7 @@ normalize_command_prefix() {
 
       if (( in_d )); then
         case "$c" in
-          '\\') esc=1 ;;
+          \\) esc=1 ;;
           '"') in_d=0 ;;
         esac
         ((i++))
@@ -71,7 +71,7 @@ normalize_command_prefix() {
 
       case "$c" in
         ' ' | $'\t') break ;;
-        '\\') esc=1 ;;
+        \\) esc=1 ;;
         "'") in_s=1 ;;
         '"') in_d=1 ;;
       esac
@@ -88,9 +88,11 @@ normalize_command_prefix() {
 
     value=${token#*=}
 
-    # Only strip plain KEY=value prefixes. Anything with shell syntax
-    # fails closed instead of being mis-parsed.
-    if [[ ! $value =~ ^[A-Za-z0-9_./:@%+=,-]*$ ]]; then
+    # The tokenizer above already walked quotes and escapes to find the
+    # correct token boundary. Reject only values with command substitution
+    # ($() or backticks) which could execute arbitrary code. All other
+    # values (plain, quoted, escaped) are safe to strip.
+    if [[ $value == *'$('* ]] || [[ $value == *'`'* ]]; then
       return 1
     fi
 
@@ -105,12 +107,13 @@ normalize_command_prefix() {
   printf '\n'
 }
 
-# Try to normalize. If it fails (complex env-var prefix with shell syntax),
-# fall through with the raw command. Anchored rules won't match the prefixed
-# form, so the command passes to the normal permission prompt instead.
-# This is safe because auto-allow-reads.sh rejects $() and backticks,
-# ensuring complex-prefix commands always require user approval.
-command=$(normalize_command_prefix "$command") || true
+# Normalize the command prefix. The lexer strips plain, quoted, and escaped
+# env var assignments. It only fails for values containing command substitution
+# ($() or backticks), which we deny outright.
+if ! command=$(normalize_command_prefix "$command"); then
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool policy: env-var prefixes with command substitution are blocked; remove the prefix or use a wrapper script."}}'
+  exit 0
+fi
 
 # Read each rule from the policy file
 # Each rule has: "match" (substring or regex), "message" (what to tell the agent)
