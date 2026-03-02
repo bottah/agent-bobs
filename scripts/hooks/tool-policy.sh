@@ -68,8 +68,11 @@ normalize_command_prefix() {
           \\) esc=1 ;;
           '"') in_d=0 ;;
           '$') # Check for $( inside double quotes (unescaped)
+            # $((  = arithmetic expansion (safe), $( = command substitution
             if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-              has_cmd_subst=1
+              if (( i + 2 >= len )) || [[ ${s:i+2:1} != '(' ]]; then
+                has_cmd_subst=1
+              fi
             fi ;;
           '`') has_cmd_subst=1 ;;
         esac
@@ -83,8 +86,11 @@ normalize_command_prefix() {
         "'") in_s=1 ;;
         '"') in_d=1 ;;
         '$') # Check for $( outside quotes (unescaped)
+          # $((  = arithmetic expansion (safe), $( = command substitution
           if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-            has_cmd_subst=1
+            if (( i + 2 >= len )) || [[ ${s:i+2:1} != '(' ]]; then
+              has_cmd_subst=1
+            fi
           fi ;;
         '`') has_cmd_subst=1 ;;
       esac
