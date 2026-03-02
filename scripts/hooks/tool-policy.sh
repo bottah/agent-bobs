@@ -1,16 +1,7 @@
 #!/bin/bash
 # tool-policy.sh — PreToolUse hook for Bash
-# Intercepts blocked commands and suggests alternatives.
-# Configure via scripts/hooks/tool-policy.json.
-# Template: ships with empty rules; developers add their own.
-
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-POLICY_FILE="$SCRIPT_DIR/tool-policy.json"
-
-# If no policy file, allow everything
-if [ ! -f "$POLICY_FILE" ]; then
-  exit 0
-fi
+# Whitelist model: allow only known command patterns, deny everything else.
+# No shell parsing. No human in the loop.
 
 json=$(cat)
 command=$(echo "$json" | jq -r '.tool_input.command // empty')
@@ -19,48 +10,70 @@ if [ -z "$command" ]; then
   exit 0
 fi
 
-# Read each rule from the policy file
-# Each rule has: "match" (substring or regex), "message" (what to tell the agent)
-rule_count=$(jq '.rules | length' "$POLICY_FILE" 2>/dev/null)
-
-if [ -z "$rule_count" ] || [ "$rule_count" = "0" ] || [ "$rule_count" = "null" ]; then
+deny() {
+  local reason="$1"
+  local escaped
+  escaped=$(printf '%s' "Tool policy: $reason" | jq -Rs .)
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":%s}}\n' "$escaped"
   exit 0
+}
+
+# ── Reject command/process substitution ──────────────────────────────────
+# These embed executable code inside arguments — block unconditionally.
+case "$command" in
+  *'$('*)  deny "Command substitution \$() is not allowed." ;;
+  *'`'*)   deny "Backtick substitution is not allowed." ;;
+  *'<('*)  deny "Process substitution <() is not allowed." ;;
+  *'>('*)  deny "Process substitution >() is not allowed." ;;
+esac
+
+# ── Explicit deny rules ─────────────────────────────────────────────────
+
+# Block push to main/master
+if echo "$command" | grep -qE '^git push .*(main|master)'; then
+  deny "Push to main/master is blocked. Push to a feature branch instead."
 fi
 
-i=0
-while [ "$i" -lt "$rule_count" ]; do
-  match=$(jq -r ".rules[$i].match // empty" "$POLICY_FILE")
-  message=$(jq -r ".rules[$i].message // empty" "$POLICY_FILE")
-  mode=$(jq -r ".rules[$i].mode // \"substring\"" "$POLICY_FILE")
+# Block pr merge without --squash
+if echo "$command" | grep -qE '^gh pr merge' && ! echo "$command" | grep -q -- '--squash'; then
+  deny "Use --squash flag for PR merges to maintain linear history."
+fi
 
-  if [ -n "$match" ]; then
-    blocked=false
+# ── Whitelist ────────────────────────────────────────────────────────────
 
-    if [ "$mode" = "regex" ]; then
-      if echo "$command" | grep -qE "$match"; then
-        blocked=true
-      fi
-    elif [ "$mode" = "pcre" ]; then
-      if echo "$command" | perl -ne "exit 0 if /$match/; exit 1" 2>/dev/null; then
-        blocked=true
-      fi
-    else
-      # Default: substring match (word-boundary aware via grep -w where possible)
-      if echo "$command" | grep -qw "$match" 2>/dev/null || [[ "$command" == *"$match"* ]]; then
-        blocked=true
-      fi
-    fi
+allowed_patterns=(
+  # Git
+  '^git '
+  '^git$'
 
-    if [ "$blocked" = true ]; then
-      # Escape message for JSON
-      escaped_message=$(echo "$message" | sed 's/"/\\"/g')
-      echo "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Tool policy: $escaped_message\"}}"
-      exit 0
-    fi
+  # GitHub CLI
+  '^gh '
+
+  # Scripts and shell
+  '^\./scripts/'
+  '^bash '
+  '^sh '
+  '^source '
+
+  # Build / test
+  '^go (build|test|mod|vet|fmt|run|install|get|doc|env)'
+  '^(npm|npx|yarn|bun|pnpm) '
+  '^(node|python3?|ruby|cargo|make|cmake) '
+
+  # Common CLI tools
+  '^(cat|ls|head|tail|wc|file|which|whoami|pwd|date|uname|find|mkdir|sort|tr|cut|sed|awk|jq|dirname|basename|realpath|tee|touch|chmod|test|true|false|echo|printf|rm|cp|mv|diff|comm|uniq|xargs|tar|gzip|gunzip|zip|unzip|grep|rg|fd|fzf|curl|wget|sleep|env|cd|pushd|popd|read|set|export|unset|mktemp|stat|readlink|open|less|more|column|rev|shuf|seq|yes|timeout|install|ln) '
+  '^(cat|ls|head|tail|wc|file|which|whoami|pwd|date|uname|echo|printf|true|false|set|env|cd) *$'
+
+  # Beads
+  '^bd '
+  '^bd$'
+)
+
+for pattern in "${allowed_patterns[@]}"; do
+  if echo "$command" | grep -qE "$pattern"; then
+    exit 0
   fi
-
-  i=$((i + 1))
 done
 
-# No rules matched — allow
-exit 0
+# Default: deny
+deny "Command not on the allowlist. Only approved git, gh, and build commands are permitted."
