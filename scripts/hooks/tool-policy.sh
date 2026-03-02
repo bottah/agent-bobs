@@ -107,19 +107,20 @@ normalize_command_prefix() {
   printf '\n'
 }
 
-# Normalize the command prefix. The lexer strips plain, quoted, and escaped
-# env var assignments. It only fails for values containing command substitution
-# ($() or backticks), which we deny outright.
-if ! command=$(normalize_command_prefix "$command"); then
-  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool policy: env-var prefixes with command substitution are blocked; remove the prefix or use a wrapper script."}}'
-  exit 0
-fi
-
 # Read each rule from the policy file
 # Each rule has: "match" (substring or regex), "message" (what to tell the agent)
 rule_count=$(jq '.rules | length' "$POLICY_FILE" 2>/dev/null)
 
 if [ -z "$rule_count" ] || [ "$rule_count" = "0" ] || [ "$rule_count" = "null" ]; then
+  exit 0
+fi
+
+# Normalize the command prefix. The lexer strips plain, quoted, and escaped
+# env var assignments. It only fails for values containing command substitution
+# ($() or backticks), which we deny outright — but only when rules exist
+# (checked above), since there's nothing to bypass with an empty policy.
+if ! command=$(normalize_command_prefix "$command"); then
+  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool policy: env-var prefixes with command substitution are blocked; remove the prefix or use a wrapper script."}}'
   exit 0
 fi
 
