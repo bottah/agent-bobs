@@ -47,6 +47,8 @@ echo "=== 1: Push to main/master → deny ==="
 expect_deny "push main"   "git push origin main"
 expect_deny "push master" "git push origin master"
 expect_deny "push -u main" "git push -u origin main"
+expect_deny "refspec main" "git push origin HEAD:main"
+expect_deny "refspec refs/heads/main" "git push origin HEAD:refs/heads/main"
 echo "  subtotal: $pass pass, $fail fail"
 
 # ── 2: Push to feature branches → allow ──────────────────────────────
@@ -58,6 +60,7 @@ expect_allow "feat branch"      "git push origin feat/my-branch"
 expect_allow "feat -u"          "git push -u origin feat/my-branch"
 expect_allow "domain-fix"       "git push origin feat/domain-fix"
 expect_allow "maintainers-docs" "git push origin maintainers-docs"
+expect_allow "local main to remote feat" "git push origin main:feature-branch"
 echo "  subtotal: $((pass - a2_start)) pass, $((fail - a2_fail_start)) fail"
 
 # ── 3: PR merge without --squash → deny ─────────────────────────────
@@ -68,6 +71,8 @@ a3_start=$pass; a3_fail_start=$fail
 expect_deny "merge default" "gh pr merge 42"
 expect_deny "merge --merge" "gh pr merge 42 --merge"
 expect_deny "merge --admin" "gh pr merge 42 --admin"
+expect_deny "merge --rebase" "gh pr merge 42 --rebase"
+expect_deny "squash in body not flag" "gh pr merge 42 --merge --body 'please use --squash later'"
 echo "  subtotal: $((pass - a3_start)) pass, $((fail - a3_fail_start)) fail"
 
 # ── 4: PR merge with --squash → allow ───────────────────────────────
