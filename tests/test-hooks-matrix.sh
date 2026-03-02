@@ -169,6 +169,7 @@ executable_wrappers=(
   'env %s'
   'env -i NO_COLOR=1 %s'
   'env -u TERM NO_COLOR=1 %s'
+  "env -S '%s'"
   'nice %s'
   'nohup %s'
   'sudo %s'

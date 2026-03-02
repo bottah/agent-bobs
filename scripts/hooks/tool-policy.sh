@@ -353,6 +353,26 @@ extract_shell_exec_arg() {
     eval)
       inner="${s#eval}"
       inner="${inner#"${inner%%[![:space:]]*}"}" ;;
+    env)
+      # env [flags] [-S string] [NAME=val]... COMMAND
+      # -S/--split-string takes a command string that env splits and executes.
+      local _rest="${s#env}"
+      _rest="${_rest#"${_rest%%[![:space:]]*}"}"
+      while [[ "$_rest" == -* ]]; do
+        local _flag="${_rest%% *}"
+        _rest="${_rest#"$_flag"}"
+        _rest="${_rest#"${_rest%%[![:space:]]*}"}"
+        case "$_flag" in
+          -S|--split-string)  inner="$_rest"; break ;;
+          -S*)                inner="${_flag#-S}"; break ;;
+          --split-string=*)   inner="${_flag#--split-string=}"; break ;;
+        esac
+        # Skip flag arguments for -u, -C, etc. (next non-flag, non-assignment word)
+        if [[ -n "$_rest" && "$_rest" != -* && "${_rest%% *}" != *=* ]]; then
+          _rest="${_rest#"${_rest%% *}"}"
+          _rest="${_rest#"${_rest%%[![:space:]]*}"}"
+        fi
+      done ;;
   esac
 
   if [[ -n "$inner" ]]; then
