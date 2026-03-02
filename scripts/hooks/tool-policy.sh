@@ -166,16 +166,9 @@ if ! command=$(normalize_command_prefix "$command"); then
   exit 0
 fi
 
-# Strip leading shell grouping syntax so anchored rules can match
-# the actual command inside subshells ( ) and brace groups { }.
-while true; do
-  case "$command" in
-    '('*) command="${command#(}" ;;
-    '{ '*) command="${command#\{ }" ;;
-    ' '*) command="${command# }" ;;
-    *) break ;;
-  esac
-done
+# Split on shell separators (;, &&, ||, newlines) to check each sub-command.
+# Then strip leading grouping syntax so anchored rules match the actual command.
+IFS=$'\n' read -r -d '' -a segments <<< "$(printf '%s' "$command" | sed 's/&&/\n/g; s/||/\n/g; s/;/\n/g')"
 
 i=0
 while [ "$i" -lt "$rule_count" ]; do
@@ -184,29 +177,41 @@ while [ "$i" -lt "$rule_count" ]; do
   mode=$(jq -r ".rules[$i].mode // \"substring\"" "$POLICY_FILE")
 
   if [ -n "$match" ]; then
-    blocked=false
+    for seg in "${segments[@]}"; do
+      # Strip leading whitespace and grouping syntax from each segment
+      while true; do
+        case "$seg" in
+          '('*) seg="${seg#(}" ;;
+          '{ '*) seg="${seg#\{ }" ;;
+          ' '*) seg="${seg# }" ;;
+          *) break ;;
+        esac
+      done
 
-    if [ "$mode" = "regex" ]; then
-      if echo "$command" | grep -qE "$match"; then
-        blocked=true
-      fi
-    elif [ "$mode" = "pcre" ]; then
-      if echo "$command" | perl -ne "exit 0 if /$match/; exit 1" 2>/dev/null; then
-        blocked=true
-      fi
-    else
-      # Default: substring match (word-boundary aware via grep -w where possible)
-      if echo "$command" | grep -qw "$match" 2>/dev/null || [[ "$command" == *"$match"* ]]; then
-        blocked=true
-      fi
-    fi
+      blocked=false
 
-    if [ "$blocked" = true ]; then
-      # Escape message for JSON
-      escaped_message=$(echo "$message" | sed 's/"/\\"/g')
-      echo "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Tool policy: $escaped_message\"}}"
-      exit 0
-    fi
+      if [ "$mode" = "regex" ]; then
+        if echo "$seg" | grep -qE "$match"; then
+          blocked=true
+        fi
+      elif [ "$mode" = "pcre" ]; then
+        if echo "$seg" | perl -ne "exit 0 if /$match/; exit 1" 2>/dev/null; then
+          blocked=true
+        fi
+      else
+        # Default: substring match (word-boundary aware via grep -w where possible)
+        if echo "$seg" | grep -qw "$match" 2>/dev/null || [[ "$seg" == *"$match"* ]]; then
+          blocked=true
+        fi
+      fi
+
+      if [ "$blocked" = true ]; then
+        # Escape message for JSON
+        escaped_message=$(echo "$message" | sed 's/"/\\"/g')
+        echo "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Tool policy: $escaped_message\"}}"
+        exit 0
+      fi
+    done
   fi
 
   i=$((i + 1))
