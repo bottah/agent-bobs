@@ -79,6 +79,11 @@ normalize_command_prefix() {
                 has_cmd_subst=1
               fi
             fi ;;
+          '<' | '>')
+            # <( and >( = process substitution inside double quotes
+            if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+              has_cmd_subst=1
+            fi ;;
           '`') has_cmd_subst=1 ;;
         esac
         ((i++))
@@ -113,6 +118,11 @@ normalize_command_prefix() {
                 ((bracket_depth++))
                 ((i++)) ;;
             esac
+          fi ;;
+        '<' | '>')
+          # <( and >( = process substitution (executes a command)
+          if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+            has_cmd_subst=1
           fi ;;
         '(') ((paren_depth++)) ;;
         ')') (( paren_depth > 0 )) && ((paren_depth--)) ;;
