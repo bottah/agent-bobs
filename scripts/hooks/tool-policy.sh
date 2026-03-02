@@ -329,15 +329,25 @@ extract_subst_from() {
   done
 }
 
-# Extract arguments passed to shell interpreters (bash -c, sh -c, eval).
+# Extract arguments passed to shell interpreters (bash -c, sh -c, eval, env -S).
 # Outputs the inner command string to be added as a segment for rule checking.
+# Strips prefix words (keywords + wrappers) first so that forms like
+# "builtin eval 'cmd'" and "command eval 'cmd'" are handled.
 extract_shell_exec_arg() {
   local s="$1"
-  # Strip leading whitespace and grouping syntax
+  # Strip leading whitespace, grouping syntax, and prefix words.
+  # Excludes env (handled below) so it remains visible as cmd_word.
+  local _sea_prefixes=" $(compgen -k | tr '\n' ' ')command exec builtin nice nohup sudo strace "
   while true; do
     case "$s" in
       ' '*|$'\t'*) s="${s#?}" ;; '('*) s="${s#(}" ;; '{ '*) s="${s#\{ }" ;;
-      *) break ;;
+      *)
+        local _sea_first="${s%% *}"
+        if [[ "$s" == *" "* ]] && [[ "$_sea_prefixes" == *" $_sea_first "* ]]; then
+          s="${s#"$_sea_first" }"
+        else
+          break
+        fi ;;
     esac
   done
 
@@ -452,6 +462,16 @@ while [ "$i" -lt "$rule_count" ]; do
               # flag-argument grammars (env -u NAME, etc.) are handled
               # in extract_shell_exec_arg instead.
               seg="${seg#"$_first" }"
+            elif [[ "$seg" == \'* ]]; then
+              # Single-quoted string: flag argument (e.g., exec -a 'name'), skip it.
+              seg="${seg#\'}"
+              seg="${seg#*\'}"
+              seg="${seg#"${seg%%[![:space:]]*}"}"
+            elif [[ "$seg" == '"'* ]]; then
+              # Double-quoted string: flag argument, skip it.
+              seg="${seg#\"}"
+              seg="${seg#*\"}"
+              seg="${seg#"${seg%%[![:space:]]*}"}"
             elif [[ "$seg" =~ ^[A-Za-z_][A-Za-z_0-9]*\+?= ]]; then
               # Strip env-var assignment prefix (NAME=value)
               _env_rest="${seg#*=}"

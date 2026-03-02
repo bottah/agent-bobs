@@ -173,6 +173,8 @@ executable_wrappers=(
   'env -u TERM NO_COLOR=1 %s'
   "env -S '%s'"
   'command -p %s'
+  'builtin eval '\''%s'\'''
+  "exec -a 'x y' %s"
   'nice %s'
   'nohup %s'
   'sudo %s'
