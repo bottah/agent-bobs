@@ -28,6 +28,7 @@ exclude=(
   --exclude='.claude/subagent.log'
   --exclude='.claude/transcript-backups'
   --exclude='docs/handoff-*.md'
+  --exclude='docs/internal/'
   --exclude='.beads'
   --exclude='.claude/beads-audit.log'
 )
@@ -51,6 +52,19 @@ done
 
 # rsync preserves directory structure, only copies what changed
 rsync -a "${exclude[@]}" "$SCRIPT_DIR/" "$TARGET/"
+
+# Clean up files that moved to docs/internal/ (previously synced to docs/)
+stale_docs=(
+  "docs/code-review-workflow-v1.md"
+  "docs/code-review-workflow-v2.md"
+  "docs/code-review-workflow-feedback.md"
+)
+for f in "${stale_docs[@]}"; do
+  if [[ -e "$TARGET/$f" ]]; then
+    rm -f "$TARGET/$f"
+    echo "Removed stale: $f"
+  fi
+done
 
 # Ensure hook scripts are executable
 chmod +x "$TARGET"/scripts/hooks/*.sh 2>/dev/null || true
