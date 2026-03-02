@@ -137,11 +137,12 @@ review_bead_id=$(bd create \
 cycle=1
 ```
 
-### 6. Post GitHub event comment
+### 6. Request review + post GitHub event comment
 
-Post a marker comment on the PR for observability:
+Request a review from the configured reviewer and post a marker comment:
 
 ```bash
+gh pr edit <pr_number> -R "$repo" --add-reviewer "$reviewer_login"
 gh pr comment <pr_number> -R "$repo" --body "$(cat <<'EVEOF'
 <!-- beads-event -->
 Code review requested: <reviewer>
