@@ -11,7 +11,7 @@
       "message": "Direct push to master is blocked. Use /branch to create a feature branch, then /pr to open a pull request."
     },
     {
-      "match": "^git push\\s*$",
+      "match": "^git push\\s*($|[0-9]*[<>])",
       "mode": "regex",
       "message": "Bare git push without an explicit branch target is blocked. Specify the remote and branch: git push origin <branch-name>"
     },

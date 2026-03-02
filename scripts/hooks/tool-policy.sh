@@ -172,13 +172,14 @@ if ! command=$(normalize_command_prefix "$command"); then
 fi
 
 # Quote-aware split on shell separators (;, &&, ||, |, newlines).
-# Respects single/double quotes and backslash escapes so separators
-# inside string arguments don't cause false positives.
+# Respects single/double quotes, backslash escapes, and substitution
+# nesting ($(), $(( )), <(), >()) so separators inside substitutions
+# don't cause false splits.
 split_command_segments() {
   local s="$1"
   local len=${#s}
   local i=0 start=0
-  local c sq=0 dq=0 esc=0
+  local c sq=0 dq=0 esc=0 sd=0
 
   while (( i < len )); do
     c=${s:i:1}
@@ -186,7 +187,18 @@ split_command_segments() {
     if (( esc )); then esc=0; ((i++)); continue; fi
     if (( sq )); then [[ $c == "'" ]] && sq=0; ((i++)); continue; fi
     if (( dq )); then
-      case "$c" in \\) esc=1 ;; '"') dq=0 ;; esac
+      case "$c" in
+        \\) esc=1 ;;
+        '"') dq=0 ;;
+        '$')
+          if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+            if (( i+2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
+              ((sd += 2)); ((i += 2))
+            else
+              ((sd++)); ((i++))
+            fi
+          fi ;;
+      esac
       ((i++)); continue
     fi
 
@@ -194,21 +206,42 @@ split_command_segments() {
       \\) esc=1 ;;
       "'") sq=1 ;;
       '"') dq=1 ;;
+      '$')
+        if (( i+1 < len )); then
+          case "${s:i+1:1}" in
+            '(')
+              if (( i+2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
+                ((sd += 2)); ((i += 2))
+              else
+                ((sd++)); ((i++))
+              fi ;;
+          esac
+        fi ;;
+      '<' | '>')
+        if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+          ((sd++)); ((i++))
+        fi ;;
+      ')')
+        (( sd > 0 )) && ((sd--)) ;;
       ';' | $'\n')
-        printf '%s\n' "${s:start:i-start}"
-        ((i++)); start=$i; continue ;;
+        if (( sd == 0 )); then
+          printf '%s\n' "${s:start:i-start}"
+          ((i++)); start=$i; continue
+        fi ;;
       '&')
-        if (( i + 1 < len )) && [[ ${s:i+1:1} == '&' ]]; then
+        if (( sd == 0 )) && (( i + 1 < len )) && [[ ${s:i+1:1} == '&' ]]; then
           printf '%s\n' "${s:start:i-start}"
           ((i += 2)); start=$i; continue
         fi ;;
       '|')
-        if (( i + 1 < len )) && [[ ${s:i+1:1} == '|' ]]; then
-          printf '%s\n' "${s:start:i-start}"
-          ((i += 2)); start=$i; continue
-        else
-          printf '%s\n' "${s:start:i-start}"
-          ((i++)); start=$i; continue
+        if (( sd == 0 )); then
+          if (( i + 1 < len )) && [[ ${s:i+1:1} == '|' ]]; then
+            printf '%s\n' "${s:start:i-start}"
+            ((i += 2)); start=$i; continue
+          else
+            printf '%s\n' "${s:start:i-start}"
+            ((i++)); start=$i; continue
+          fi
         fi ;;
     esac
     ((i++))
@@ -285,15 +318,59 @@ extract_subst_from() {
   done
 }
 
+# Extract arguments passed to shell interpreters (bash -c, sh -c, eval).
+# Outputs the inner command string to be added as a segment for rule checking.
+extract_shell_exec_arg() {
+  local s="$1"
+  # Strip leading whitespace and grouping syntax
+  while true; do
+    case "$s" in
+      ' '*|$'\t'*) s="${s#?}" ;; '('*) s="${s#(}" ;; '{ '*) s="${s#\{ }" ;;
+      *) break ;;
+    esac
+  done
+
+  local inner=""
+  local cmd_word="${s%% *}"
+
+  case "$cmd_word" in
+    bash|sh|dash|zsh|ksh)
+      # Match: shell [flags] -[opts]c <arg>  (e.g., bash -lc 'cmd', sh -c 'cmd')
+      if [[ "$s" =~ ^[a-z]+[[:space:]]+(-[A-Za-z]+[[:space:]]+)*-[A-Za-z]*c[[:space:]]+(.*) ]]; then
+        inner="${BASH_REMATCH[2]}"
+      fi ;;
+    eval)
+      inner="${s#eval}"
+      inner="${inner#"${inner%%[![:space:]]*}"}" ;;
+  esac
+
+  if [[ -n "$inner" ]]; then
+    case "${inner:0:1}" in
+      "'") inner="${inner:1}"; printf '%s\n' "${inner%%\'*}" ;;
+      '"') inner="${inner:1}"; printf '%s\n' "${inner%%\"*}" ;;
+      *)   printf '%s\n' "$inner" ;;
+    esac
+  fi
+}
+
 # Build segment list: start with top-level splits, then iteratively extract
-# substitution contents. Each new extraction is appended and itself processed,
-# so arbitrary nesting depth is handled without a fixed pass limit.
+# substitution contents and shell interpreter arguments. Extracted content is
+# re-split on shell operators so nested separators (;, &&, etc.) are handled.
 IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command")"
 idx=0
 while (( idx < ${#segments[@]} )); do
   while IFS= read -r extracted; do
-    [[ -n "$extracted" ]] && segments+=("$extracted")
+    [[ -n "$extracted" ]] || continue
+    while IFS= read -r sub; do
+      [[ -n "$sub" ]] && segments+=("$sub")
+    done <<< "$(split_command_segments "$extracted")"
   done <<< "$(extract_subst_from "${segments[$idx]}")"
+  while IFS= read -r extracted; do
+    [[ -n "$extracted" ]] || continue
+    while IFS= read -r sub; do
+      [[ -n "$sub" ]] && segments+=("$sub")
+    done <<< "$(split_command_segments "$extracted")"
+  done <<< "$(extract_shell_exec_arg "${segments[$idx]}")"
   ((idx++))
 done
 
@@ -308,9 +385,15 @@ while [ "$i" -lt "$rule_count" ]; do
       # Strip leading whitespace and grouping syntax from each segment
       while true; do
         case "$seg" in
-          '('*) seg="${seg#(}" ;;
-          '{ '*) seg="${seg#\{ }" ;;
-          ' '*) seg="${seg# }" ;;
+          '('*) seg="${seg#(}" ;; '{ '*) seg="${seg#\{ }" ;;
+          ' '*|$'\t'*) seg="${seg#?}" ;; *) break ;;
+        esac
+      done
+      # Strip trailing grouping syntax, semicolons, and whitespace
+      while true; do
+        case "$seg" in
+          *')') seg="${seg%)}" ;; *' }') seg="${seg% \}}" ;;
+          *';') seg="${seg%;}" ;; *' '|*$'\t') seg="${seg%?}" ;;
           *) break ;;
         esac
       done
