@@ -43,10 +43,12 @@ normalize_command_prefix() {
     in_d=0
     esc=0
     local has_cmd_subst=0
+    local arith_depth=0
 
     # Read one shell-ish token, honoring quotes and backslash escapes well
     # enough to find token boundaries without evaluating anything.
     # Track unescaped $( and backticks to detect command substitution.
+    # Track $(( depth so spaces inside arithmetic don't break the token.
     while (( i < len )); do
       c=${s:i:1}
 
@@ -81,17 +83,25 @@ normalize_command_prefix() {
       fi
 
       case "$c" in
-        ' ' | $'\t') break ;;
+        ' ' | $'\t')
+          # Don't break inside arithmetic expansion — spaces are valid there
+          if (( arith_depth > 0 )); then :; else break; fi ;;
         \\) esc=1 ;;
         "'") in_s=1 ;;
         '"') in_d=1 ;;
         '$') # Check for $( outside quotes (unescaped)
-          # $((  = arithmetic expansion (safe), $( = command substitution
           if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-            if (( i + 2 >= len )) || [[ ${s:i+2:1} != '(' ]]; then
+            if (( i + 2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
+              # $(( = arithmetic expansion — track depth, skip past $((
+              arith_depth=1
+              ((i += 2))
+            else
+              # $( = command substitution
               has_cmd_subst=1
             fi
           fi ;;
+        '(') (( arith_depth > 0 )) && ((arith_depth++)) ;;
+        ')') (( arith_depth > 0 )) && ((arith_depth--)) ;;
         '`') has_cmd_subst=1 ;;
       esac
       ((i++))
