@@ -212,52 +212,22 @@ split_command_segments() {
   (( start < len )) && printf '%s\n' "${s:start}"
 }
 
-# Extract command substitution contents ($(...) and backticks) as additional
-# segments so blocked commands inside substitutions are also checked.
-extract_subst_segments() {
-  local seg
-  while IFS= read -r seg; do
-    printf '%s\n' "$seg"
-    local s="$seg"
-    local len=${#s} i=0 c sq=0 dq=0 esc=0 depth start
-    while (( i < len )); do
-      c=${s:i:1}
-      if (( esc )); then esc=0; ((i++)); continue; fi
-      if (( sq )); then [[ $c == "'" ]] && sq=0; ((i++)); continue; fi
-      if (( dq )); then
-        case "$c" in
-          \\) esc=1 ;;
-          '"') dq=0 ;;
-          '$')
-            # $() inside double quotes still executes
-            if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-              if ! (( i+2 < len )) || [[ ${s:i+2:1} != '(' ]]; then
-                ((i += 2)); start=$i; depth=1
-                while (( i < len && depth > 0 )); do
-                  case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
-                  (( depth > 0 )) && ((i++))
-                done
-                printf '%s\n' "${s:start:i-start}"
-              fi
-            fi ;;
-          '`')
-            ((i++)); start=$i
-            while (( i < len )) && [[ ${s:i:1} != '`' ]]; do ((i++)); done
-            printf '%s\n' "${s:start:i-start}"
-            ;;
-        esac
-        ((i++)); continue
-      fi
+# Extract command substitution contents ($(), backticks, <(), >()) from a
+# single segment. Outputs ONLY the extracted inner contents, not the original.
+extract_subst_from() {
+  local s="$1"
+  local len=${#s} i=0 c sq=0 dq=0 esc=0 depth start
+  while (( i < len )); do
+    c=${s:i:1}
+    if (( esc )); then esc=0; ((i++)); continue; fi
+    if (( sq )); then [[ $c == "'" ]] && sq=0; ((i++)); continue; fi
+    if (( dq )); then
       case "$c" in
         \\) esc=1 ;;
-        "'") sq=1 ;;
-        '"') dq=1 ;;
+        '"') dq=0 ;;
         '$')
           if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-            if (( i+2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
-              ((i++))  # $(( = arithmetic, skip
-            else
-              # $( = command substitution — extract inner content
+            if ! (( i+2 < len )) || [[ ${s:i+2:1} != '(' ]]; then
               ((i += 2)); start=$i; depth=1
               while (( i < len && depth > 0 )); do
                 case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
@@ -266,30 +236,61 @@ extract_subst_segments() {
               printf '%s\n' "${s:start:i-start}"
             fi
           fi ;;
-        '<' | '>')
-          # <( and >( = process substitution — extract inner content
-          if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-            ((i += 2)); start=$i; depth=1
-            while (( i < len && depth > 0 )); do
-              case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
-              (( depth > 0 )) && ((i++))
-            done
-            printf '%s\n' "${s:start:i-start}"
-          fi ;;
         '`')
           ((i++)); start=$i
           while (( i < len )) && [[ ${s:i:1} != '`' ]]; do ((i++)); done
           printf '%s\n' "${s:start:i-start}"
           ;;
       esac
-      ((i++))
-    done
+      ((i++)); continue
+    fi
+    case "$c" in
+      \\) esc=1 ;;
+      "'") sq=1 ;;
+      '"') dq=1 ;;
+      '$')
+        if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+          if (( i+2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
+            ((i++))
+          else
+            ((i += 2)); start=$i; depth=1
+            while (( i < len && depth > 0 )); do
+              case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
+              (( depth > 0 )) && ((i++))
+            done
+            printf '%s\n' "${s:start:i-start}"
+          fi
+        fi ;;
+      '<' | '>')
+        if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+          ((i += 2)); start=$i; depth=1
+          while (( i < len && depth > 0 )); do
+            case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
+            (( depth > 0 )) && ((i++))
+          done
+          printf '%s\n' "${s:start:i-start}"
+        fi ;;
+      '`')
+        ((i++)); start=$i
+        while (( i < len )) && [[ ${s:i:1} != '`' ]]; do ((i++)); done
+        printf '%s\n' "${s:start:i-start}"
+        ;;
+    esac
+    ((i++))
   done
 }
 
-# Extract substitution contents, piped twice to handle nested substitutions
-# (e.g., echo $(cat <(blocked-cmd)) — first pass extracts $(), second extracts <()).
-IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command" | extract_subst_segments | extract_subst_segments)"
+# Build segment list: start with top-level splits, then iteratively extract
+# substitution contents. Each new extraction is appended and itself processed,
+# so arbitrary nesting depth is handled without a fixed pass limit.
+IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command")"
+idx=0
+while (( idx < ${#segments[@]} )); do
+  while IFS= read -r extracted; do
+    [[ -n "$extracted" ]] && segments+=("$extracted")
+  done <<< "$(extract_subst_from "${segments[$idx]}")"
+  ((idx++))
+done
 
 i=0
 while [ "$i" -lt "$rule_count" ]; do
