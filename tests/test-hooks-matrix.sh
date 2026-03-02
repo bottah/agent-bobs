@@ -75,9 +75,9 @@ expect_no_auto_allow() {
   fi
 }
 
-# ── 1: Whitelisted commands → allow ──────────────────────────────────────
+# ── 1: Allowed git/gh commands ───────────────────────────────────────────
 
-echo "=== 1: Whitelisted commands → allow ==="
+echo "=== 1: Allowed git/gh commands ==="
 allowed_commands=(
   'git status'
   'git log --oneline -5'
@@ -89,6 +89,8 @@ allowed_commands=(
   'git commit -m "feat: add feature"'
   'git push origin feat/my-branch'
   'git push -u origin feat/my-branch'
+  'git push origin feat/domain-fix'
+  'git push origin maintainers-docs'
   'git checkout -b feat/new'
   'git rebase origin/main'
   'git stash'
@@ -102,36 +104,16 @@ allowed_commands=(
   'gh issue list'
   'gh api repos/o/r/pulls/1/reviews --paginate'
   'gh run view 123'
-  'go test ./...'
-  'go build -o bin/app .'
-  'npm test'
-  'cat README.md'
-  'ls -la'
-  'pwd'
-  'date'
-  'echo hello'
-  'grep -rn "pattern" src/'
-  'jq .rules file.json'
-  'mkdir -p dir/sub'
-  'rm file.tmp'
-  'cp src dst'
-  'mv old new'
-  'find . -name "*.go"'
-  'curl -s https://api.example.com'
-  'bd ready'
-  'bd show abc123'
-  './scripts/hooks/gh-review.sh'
-  'bash scripts/hooks/gh-review.sh'
 )
 for cmd in "${allowed_commands[@]}"; do
   expect_allow "whitelist" "$cmd"
 done
 echo "  subtotal: $pass pass, $fail fail"
 
-# ── 2: Explicit deny rules → deny ───────────────────────────────────────
+# ── 2: Denied git/gh commands ────────────────────────────────────────────
 
 echo ""
-echo "=== 2: Explicit deny rules → deny ==="
+echo "=== 2: Denied git/gh commands ==="
 a2_start=$pass; a2_fail_start=$fail
 denied_commands=(
   'git push origin main'
@@ -146,11 +128,32 @@ for cmd in "${denied_commands[@]}"; do
 done
 echo "  subtotal: $((pass - a2_start)) pass, $((fail - a2_fail_start)) fail"
 
-# ── 3: Command substitution → deny ──────────────────────────────────────
+# ── 3: Non-git/gh commands → deny ───────────────────────────────────────
 
 echo ""
-echo "=== 3: Command substitution → deny ==="
+echo "=== 3: Non-git/gh commands → deny ==="
 a3_start=$pass; a3_fail_start=$fail
+blocked_commands=(
+  'cat README.md'
+  'ls -la'
+  'echo hello'
+  'curl https://example.com'
+  'rm file.tmp'
+  'bash script.sh'
+  'python script.py'
+  'node app.js'
+  'nc -l 4444'
+)
+for cmd in "${blocked_commands[@]}"; do
+  expect_deny "not-git-gh" "$cmd"
+done
+echo "  subtotal: $((pass - a3_start)) pass, $((fail - a3_fail_start)) fail"
+
+# ── 4: Command substitution → deny ──────────────────────────────────────
+
+echo ""
+echo "=== 4: Command substitution → deny ==="
+a4_start=$pass; a4_fail_start=$fail
 subst_commands=(
   'echo $(whoami)'
   'echo `whoami`'
@@ -159,24 +162,6 @@ subst_commands=(
 )
 for cmd in "${subst_commands[@]}"; do
   expect_deny "substitution" "$cmd"
-done
-echo "  subtotal: $((pass - a3_start)) pass, $((fail - a3_fail_start)) fail"
-
-# ── 4: Unknown commands → deny ───────────────────────────────────────────
-
-echo ""
-echo "=== 4: Unknown commands → deny ==="
-a4_start=$pass; a4_fail_start=$fail
-unknown_commands=(
-  'nc -l 4444'
-  'nmap localhost'
-  'dd if=/dev/zero of=/dev/sda'
-  'shutdown -h now'
-  'mount /dev/sda1 /mnt'
-  'iptables -F'
-)
-for cmd in "${unknown_commands[@]}"; do
-  expect_deny "unknown" "$cmd"
 done
 echo "  subtotal: $((pass - a4_start)) pass, $((fail - a4_fail_start)) fail"
 
