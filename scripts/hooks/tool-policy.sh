@@ -19,19 +19,96 @@ if [ -z "$command" ]; then
   exit 0
 fi
 
-# Fail closed on env-var prefixes we cannot safely normalize (command
-# substitution via $(...) or backticks). Block rather than mis-parse.
-if echo "$command" | grep -qE '^[[:space:]]*([A-Za-z_][A-Za-z_0-9]*=("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]]*)[[:space:]]+)*[A-Za-z_][A-Za-z_0-9]*=\$\(' \
-  || echo "$command" | grep -qE '^[[:space:]]*([A-Za-z_][A-Za-z_0-9]*=("[^"]*"|'"'"'[^'"'"']*'"'"'|[^[:space:]]*)[[:space:]]+)*[A-Za-z_][A-Za-z_0-9]*=`'; then
+# Normalize: strip leading env var assignments so anchored rules can't be
+# bypassed by prefixing KEY=val. Walks the command character by character to
+# handle quotes and escapes. Strips plain KEY=value prefixes; fails closed
+# on values containing shell syntax ($(), backticks, etc.).
+normalize_command_prefix() {
+  local s="$1"
+  local len=${#s}
+  local i=0 start=0
+  local c token value
+  local in_s=0 in_d=0 esc=0
+
+  # Skip leading horizontal whitespace.
+  while (( i < len )); do
+    c=${s:i:1}
+    [[ $c == ' ' || $c == $'\t' ]] || break
+    ((i++))
+  done
+
+  while (( i < len )); do
+    start=$i
+    in_s=0
+    in_d=0
+    esc=0
+
+    # Read one shell-ish token, honoring quotes and backslash escapes well
+    # enough to find token boundaries without evaluating anything.
+    while (( i < len )); do
+      c=${s:i:1}
+
+      if (( esc )); then
+        esc=0
+        ((i++))
+        continue
+      fi
+
+      if (( in_s )); then
+        [[ $c == "'" ]] && in_s=0
+        ((i++))
+        continue
+      fi
+
+      if (( in_d )); then
+        case "$c" in
+          '\\') esc=1 ;;
+          '"') in_d=0 ;;
+        esac
+        ((i++))
+        continue
+      fi
+
+      case "$c" in
+        ' ' | $'\t') break ;;
+        '\\') esc=1 ;;
+        "'") in_s=1 ;;
+        '"') in_d=1 ;;
+      esac
+      ((i++))
+    done
+
+    token=${s:start:i-start}
+
+    # First non-assignment token: this is the real command.
+    if [[ ! $token =~ ^[A-Za-z_][A-Za-z_0-9]*= ]]; then
+      printf '%s\n' "${s:start}"
+      return 0
+    fi
+
+    value=${token#*=}
+
+    # Only strip plain KEY=value prefixes. Anything with shell syntax
+    # fails closed instead of being mis-parsed.
+    if [[ ! $value =~ ^[A-Za-z0-9_./:@%+=,-]*$ ]]; then
+      return 1
+    fi
+
+    # Skip whitespace before the next token.
+    while (( i < len )); do
+      c=${s:i:1}
+      [[ $c == ' ' || $c == $'\t' ]] || break
+      ((i++))
+    done
+  done
+
+  printf '\n'
+}
+
+if ! command=$(normalize_command_prefix "$command"); then
   echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool policy: complex env-var prefixes are blocked; remove the prefix or use a wrapper script."}}'
   exit 0
 fi
-
-# Normalize: strip leading env var assignments (e.g., NO_COLOR=1 FOO="a b" ...)
-# so anchored rules can't be bypassed by prefixing KEY=val before the command.
-# Handles unquoted, double-quoted, and single-quoted values with space/tab
-# delimiters.
-command=$(echo "$command" | sed -E $'s/^([A-Za-z_][A-Za-z_0-9]*=("[^"]*"|\'[^\']*\'|[^[:space:]]*)[[:space:]]+)*//')
 
 # Read each rule from the policy file
 # Each rule has: "match" (substring or regex), "message" (what to tell the agent)
