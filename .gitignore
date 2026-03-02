@@ -1,4 +1,7 @@
 
+# Beads runtime (stealth mode — local only)
+.beads/
+
 # Dolt database files (added by bd init)
 .dolt/
 *.db

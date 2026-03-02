@@ -31,6 +31,7 @@ gh auth status
 - Read config: `.claude/code-review-workflow.yml`
 - Extract from config:
   - `reviewer` — first key under `reviewers:` (v1 uses only the first)
+  - `reviewer_login` — the `github_login:` value for that reviewer (used to filter poll results)
   - `reviewer_focus` — the `focus:` value for that reviewer
   - `max_review_cycles` — from `limits:`
   - `poll_interval_seconds` — from `limits:`
@@ -150,12 +151,14 @@ EVEOF
 
 ### 7. Poll loop
 
-Poll the review bead status until resolution or timeout:
+Poll GitHub review status until resolution or timeout. The authoring session
+polls GitHub directly and maps verdicts into local bead state.
 
 ```bash
 start_time=$(date +%s)
 # review_bead_id and cycle are set from step 5, or reloaded from
 # bead metadata when resuming (see Resumability section below).
+reviewed_sha=$(bd show "$review_bead_id" --json | jq -r '.[0].metadata.head_sha')
 
 while true; do
   sleep $poll_interval_seconds
@@ -169,22 +172,31 @@ while true; do
     exit 0
   fi
 
-  # Check review bead status (always poll the current cycle's bead)
-  # Note: bd show --json returns an array; use .[0] to get the object
-  review_status=$(bd show "$review_bead_id" --json | jq -r '.[0].status')
+  # Poll GitHub for the latest review on this PR from the configured reviewer
+  latest_review=$(gh api repos/$repo/pulls/<pr_number>/reviews --paginate \
+    --jq "[.[] | select(.commit_id == \"$reviewed_sha\" and .user.login == \"$reviewer_login\")] | sort_by(.submitted_at) | last")
 
-  case "$review_status" in
-    closed)
-      # Reviewer approved — proceed to merge
+  if [ -z "$latest_review" ] || [ "$latest_review" = "null" ]; then
+    continue  # No review yet
+  fi
+
+  review_state=$(echo "$latest_review" | jq -r '.state')
+  review_id=$(echo "$latest_review" | jq -r '.id')
+
+  case "$review_state" in
+    APPROVED)
+      # Map GitHub approval into local bead state and proceed to merge
+      bd close "$review_bead_id" --reason "Approved at $reviewed_sha (GH review $review_id)"
       break
       ;;
-    blocked)
-      # Reviewer requested changes
-      feedback=$(bd show "$review_bead_id" --json | jq -r '.[0].notes' | grep 'REQUEST_CHANGES:')
+    CHANGES_REQUESTED)
+      # Fetch the review body for feedback
+      feedback=$(echo "$latest_review" | jq -r '.body')
+      bd update "$review_bead_id" --status blocked \
+        --append-notes "REQUEST_CHANGES: $feedback"
 
       # Check cycle limit
       if [ $((cycle + 1)) -gt $max_review_cycles ]; then
-        # Limit reached — flag and stop
         gh pr comment <pr_number> -R "$repo" --body "<!-- beads-event --> Review cycle limit reached ($cycle/$max_review_cycles). PR flagged for human review."
         gh pr edit <pr_number> -R "$repo" --add-label "$pr_label"
         bd update <feature-bead-id> --status blocked
@@ -205,6 +217,7 @@ while true; do
       # Create new review bead for next cycle and update the tracked bead ID
       cycle=$((cycle + 1))
       head_sha=$(git rev-parse HEAD)
+      reviewed_sha="$head_sha"
       review_bead_id=$(bd create \
         --title "Review PR #<pr_number> [$reviewer] (cycle $cycle)" \
         --type task \
@@ -300,7 +313,7 @@ Check for existing state at each step before creating new artifacts.
 ## Rules
 
 - All `gh` commands must use `-R owner/repo` (SSH aliases prevent auto-detection)
-- Claude never closes review beads — only the reviewer can set `closed` status
+- Claude maps GitHub review verdicts into local bead state (close on APPROVED, block on CHANGES_REQUESTED)
 - On timeout: do not modify any bead state, just pause and instruct to resume
 - On cycle limit: label PR, block feature bead, stop
 - Use `--squash` for all PR merges to maintain linear history

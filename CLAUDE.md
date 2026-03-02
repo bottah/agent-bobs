@@ -99,7 +99,7 @@ Cross-platform code review using beads for coordination. Claude implements featu
 
 **Quick start**: `/code-review #42` (from issue) or `/code-review "add user search"` (from description)
 
-**Requirements**: `bd` CLI, `gh` CLI (authenticated), beads database (`bd init`)
+**Requirements**: `bd` CLI, `gh` CLI (authenticated), beads database (`bd init --stealth`)
 
 **Flow**: resolve issue → branch → implement → PR → review bead → poll for verdict → fix if needed → merge on approval
 

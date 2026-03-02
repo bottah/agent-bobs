@@ -220,7 +220,7 @@ When Claude reads bead notes containing `INFRA_FAILURE:`, it:
 | `command -v bd` | Fail fast: "bd CLI not found. Install: `brew install beads` or `go install github.com/steveyegge/beads/cmd/bd@latest`" |
 | `command -v gh` | Fail fast: "gh CLI not found. Install: `brew install gh`" |
 | `gh auth status` | Fail fast: "gh not authenticated. Run `gh auth login`" |
-| `bd ready --json` (test db access) | Fail fast: "beads not initialized. Run `bd init`" |
+| `bd ready --json` (test db access) | Fail fast: "beads not initialized. Run `bd init --stealth`" |
 
 ### Stale State Detection
 

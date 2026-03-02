@@ -1,6 +1,6 @@
 # Beads Code Review Workflow
 
-Cross-platform code review workflow where Claude implements features, an external reviewer (e.g., Codex) reviews PRs, and beads coordinates the handoff.
+Code review workflow where Claude implements features and tracks state locally via beads. The external reviewer (e.g., Codex) reviews PRs on GitHub — beads coordinates the authoring session's lifecycle, not cross-clone state.
 
 ## Prerequisites
 
@@ -63,41 +63,11 @@ on_limit_reached:
 
 Re-invoke `/code-review <bead-id>` at any point to resume from where the workflow left off. The skill detects existing state (branches, PRs, review beads) and skips completed steps.
 
-## Reviewer Agent Interface
+## Reviewer Interface
 
-External reviewers poll for review beads and post GitHub reviews:
+The external reviewer (e.g., Codex) reviews PRs directly on GitHub — it does not need access to the beads database. The authoring session polls for the GitHub review verdict and updates local bead state accordingly.
 
-```
-loop forever:
-  ready = bd ready --json --label "reviewer:<id>"
-  if ready is empty: sleep 60; continue
-
-  bead_id = ready[0].id
-  bd update <bead_id> --claim --json
-
-  bead = bd show <bead_id> --json
-  pr, repo, head_sha, feature_bead = bead.metadata
-
-  # Fetch PR context
-  gh pr view <pr> -R <repo> --json title,body,files
-  gh pr diff <pr> -R <repo>
-  bd show <feature_bead> --json
-
-  verdict, review_body = perform_review(pr_diff, feature_context)
-
-  if verdict is APPROVE:
-    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
-      --event APPROVE --body <review_body> --commit-id <head_sha>
-    bd close <bead_id> --reason "Approved at <head_sha>"
-
-  if verdict is REQUEST_CHANGES:
-    ./scripts/hooks/gh-review.sh --repo <repo> --pr <pr> \
-      --event REQUEST_CHANGES --body <review_body> --commit-id <head_sha>
-    bd update <bead_id> --status blocked \
-      --append-notes "REQUEST_CHANGES: <review_body>"
-```
-
-**Reviewer requirements**: `bd` CLI, `gh` CLI with `talosaether` auth context (`gh auth login`, then select the `talosaether` account), repo read access, review write access, no merge permission.
+**Reviewer requirements**: `gh` CLI with `talosaether` auth context, repo read access, review write access, no merge permission.
 
 ## Observability
 
@@ -128,11 +98,11 @@ Install the beads CLI. The workflow checks for `bd` at startup and in the sessio
 
 ### Review bead stuck in `open`
 
-The reviewer agent hasn't claimed it yet. Check that the reviewer is running and polling with the correct label (`reviewer:<name>`).
+The authoring session is waiting for a GitHub review on the PR. Check that the reviewer has been notified and has access to the repo.
 
-### Review bead stuck in `in_progress`
+### No GitHub review appearing
 
-The reviewer claimed it but hasn't posted a verdict. Check the reviewer agent logs. If the reviewer crashed, the bead may need manual intervention.
+The reviewer account may lack repo access. See issue #57 for preflight validation.
 
 ### Merge gate fails with SHA mismatch
 
@@ -148,4 +118,4 @@ Claude waited `max_wait_minutes` without a review verdict. No bead state is modi
 
 ### Beads database not initialized
 
-Run `bd init` in your project root, or re-run `install.sh` which will initialize it automatically if `bd` is available.
+Run `bd init --stealth` in your project root, or re-run `install.sh` which will initialize it automatically if `bd` is available. The `--stealth` flag prevents beads files from being tracked by git, avoiding artifact pollution in PRs.
