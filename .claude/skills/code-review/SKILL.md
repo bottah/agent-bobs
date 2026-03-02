@@ -31,6 +31,7 @@ gh auth status
 - Read config: `.claude/code-review-workflow.yml`
 - Extract from config:
   - `reviewer` — first key under `reviewers:` (v1 uses only the first)
+  - `reviewer_login` — the `github_login:` value for that reviewer (used to filter poll results)
   - `reviewer_focus` — the `focus:` value for that reviewer
   - `max_review_cycles` — from `limits:`
   - `poll_interval_seconds` — from `limits:`
@@ -171,9 +172,9 @@ while true; do
     exit 0
   fi
 
-  # Poll GitHub for the latest review on this PR
+  # Poll GitHub for the latest review on this PR from the configured reviewer
   latest_review=$(gh api repos/$repo/pulls/<pr_number>/reviews --paginate \
-    --jq "[.[] | select(.commit_id == \"$reviewed_sha\")] | sort_by(.submitted_at) | last")
+    --jq "[.[] | select(.commit_id == \"$reviewed_sha\" and .user.login == \"$reviewer_login\")] | sort_by(.submitted_at) | last")
 
   if [ -z "$latest_review" ] || [ "$latest_review" = "null" ]; then
     continue  # No review yet
