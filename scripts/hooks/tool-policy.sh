@@ -393,35 +393,51 @@ while [ "$i" -lt "$rule_count" ]; do
 
   if [ -n "$match" ]; then
     for seg in "${segments[@]}"; do
-      # Strip leading whitespace, grouping syntax, and compound-command keywords
+      # Normalize the segment to extract the actual command word.
+      # Strips (in a single loop): whitespace, grouping syntax,
+      # compound-command keywords, command-executing builtins/wrappers,
+      # and env-var assignments (NAME=value).
+      #
+      # Keywords/builtins are in a lookup set — add new entries to
+      # _prefix_words rather than adding individual case branches.
+      # Bash keywords from the running shell — never goes stale.
+      # Command-executing wrappers: small stable set of programs that
+      # take another command as their argument.
+      _prefix_words=" $(compgen -k | tr '\n' ' ')command exec builtin env nice nohup sudo strace "
       while true; do
         case "$seg" in
-          '('*) seg="${seg#(}" ;; '{ '*) seg="${seg#\{ }" ;;
-          'then '*) seg="${seg#then }" ;; 'else '*) seg="${seg#else }" ;;
-          'do '*) seg="${seg#do }" ;; '! '*) seg="${seg#! }" ;;
-          'time '*) seg="${seg#time }" ;;
-          'command '*) seg="${seg#command }" ;; 'exec '*) seg="${seg#exec }" ;;
-          'env '*) seg="${seg#env }" ;;
-          ' '*|$'\t'*) seg="${seg#?}" ;; *) break ;;
+          '('*) seg="${seg#(}" ;; '{ '*) seg="${seg#\{ }" ;; ' '*|$'\t'*) seg="${seg#?}" ;;
+          *)
+            _first="${seg%% *}"
+            if [[ "$seg" == *" "* ]] && [[ "$_prefix_words" == *" $_first "* ]]; then
+              seg="${seg#"$_first" }"
+            elif [[ "$_first" == -* ]] && [[ "$seg" == *" "* ]]; then
+              # Flag (e.g., -i, -u, --verbose): not a command, strip it.
+              seg="${seg#"$_first" }"
+              seg="${seg#"${seg%%[![:space:]]*}"}"
+              # If next word is a bare identifier (no = or - or /), treat
+              # it as a flag argument (e.g., -u TERM) and strip it too.
+              _next="${seg%% *}"
+              if [[ -n "$_next" && "$_next" != -* && "$_next" != *=* && "$_next" != */* && "$seg" == *" "* ]]; then
+                seg="${seg#"$_next" }"
+              fi
+            elif [[ "$seg" =~ ^[A-Za-z_][A-Za-z_0-9]*\+?= ]]; then
+              # Strip env-var assignment prefix (NAME=value)
+              _env_rest="${seg#*=}"
+              case "${_env_rest:0:1}" in
+                "'") _env_rest="${_env_rest:1}"; _env_rest="${_env_rest#*\'}" ;;
+                '"') _env_rest="${_env_rest:1}"; _env_rest="${_env_rest#*\"}" ;;
+                *)   _env_nows="${_env_rest%%[[:space:]]*}"
+                     [[ "$_env_nows" == "$_env_rest" ]] && break
+                     _env_rest="${_env_rest#"$_env_nows"}" ;;
+              esac
+              _env_rest="${_env_rest#"${_env_rest%%[![:space:]]*}"}"
+              [[ -z "$_env_rest" ]] && break
+              seg="$_env_rest"
+            else
+              break
+            fi ;;
         esac
-      done
-      # Strip env-var assignment prefixes (NAME=value) from segment.
-      # Handles assignments left over after 'env' keyword stripping and
-      # assignments that appear in extracted substitution content.
-      while [[ "$seg" =~ ^[A-Za-z_][A-Za-z_0-9]*\+?= ]]; do
-        _env_rest="${seg#*=}"
-        case "${_env_rest:0:1}" in
-          "'") _env_rest="${_env_rest:1}"; _env_rest="${_env_rest#*\'}" ;;
-          '"') _env_rest="${_env_rest:1}"; _env_rest="${_env_rest#*\"}" ;;
-          *)   # Unquoted: skip to next whitespace
-               _env_nows="${_env_rest%%[[:space:]]*}"
-               [[ "$_env_nows" == "$_env_rest" ]] && break  # No space found — not a prefix
-               _env_rest="${_env_rest#"$_env_nows"}" ;;
-        esac
-        # Trim leading whitespace for next iteration
-        _env_rest="${_env_rest#"${_env_rest%%[![:space:]]*}"}"
-        [[ -z "$_env_rest" ]] && break  # Nothing left after assignment
-        seg="$_env_rest"
       done
       # Strip leading I/O redirections (>file, 2>file, &>file, etc.)
       # In Bash, redirections can appear before the command word.
