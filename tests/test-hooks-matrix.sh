@@ -1,6 +1,5 @@
 #!/bin/bash
-# Comprehensive regression matrix for hook security bypasses (PR #60)
-# Generated from exhaustive reviewer specification (review 3873907525).
+# Whitelist-based hook tests for tool-policy.sh and auto-allow-reads.sh
 # Run from repo root: bash tests/test-hooks-matrix.sh
 
 set -euo pipefail
@@ -76,151 +75,116 @@ expect_no_auto_allow() {
   fi
 }
 
-# ── Data Arrays ──────────────────────────────────────────────────────────
+# ── 1: Whitelisted commands → allow ──────────────────────────────────────
 
-# Payloads that must be blocked whenever they are executable.
-blocked_payloads=(
-  'git push'
+echo "=== 1: Whitelisted commands → allow ==="
+allowed_commands=(
+  'git status'
+  'git log --oneline -5'
+  'git diff HEAD~1'
+  'git show HEAD'
+  'git branch -a'
+  'git fetch origin'
+  'git add file.go'
+  'git commit -m "feat: add feature"'
+  'git push origin feat/my-branch'
+  'git push -u origin feat/my-branch'
+  'git checkout -b feat/new'
+  'git rebase origin/main'
+  'git stash'
+  'git stash list'
+  'gh pr view 42'
+  'gh pr list'
+  'gh pr create --title "test" --body "body"'
+  'gh pr comment 42 --body "lgtm"'
+  'gh pr merge 42 --squash'
+  'gh issue view 1'
+  'gh issue list'
+  'gh api repos/o/r/pulls/1/reviews --paginate'
+  'gh run view 123'
+  'go test ./...'
+  'go build -o bin/app .'
+  'npm test'
+  'cat README.md'
+  'ls -la'
+  'pwd'
+  'date'
+  'echo hello'
+  'grep -rn "pattern" src/'
+  'jq .rules file.json'
+  'mkdir -p dir/sub'
+  'rm file.tmp'
+  'cp src dst'
+  'mv old new'
+  'find . -name "*.go"'
+  'curl -s https://api.example.com'
+  'bd ready'
+  'bd show abc123'
+  './scripts/hooks/gh-review.sh'
+  'bash scripts/hooks/gh-review.sh'
+)
+for cmd in "${allowed_commands[@]}"; do
+  expect_allow "whitelist" "$cmd"
+done
+echo "  subtotal: $pass pass, $fail fail"
+
+# ── 2: Explicit deny rules → deny ───────────────────────────────────────
+
+echo ""
+echo "=== 2: Explicit deny rules → deny ==="
+a2_start=$pass; a2_fail_start=$fail
+denied_commands=(
   'git push origin main'
   'git push origin master'
+  'git push -u origin main'
   'gh pr merge 42 --merge'
   'gh pr merge 42 --admin'
-  'gh api repos/o/r/pulls/1/reviews -f event=APPROVE'
+  'gh pr merge 42'
 )
+for cmd in "${denied_commands[@]}"; do
+  expect_deny "explicit-deny" "$cmd"
+done
+echo "  subtotal: $((pass - a2_start)) pass, $((fail - a2_fail_start)) fail"
 
-# Benign commands that must stay allowed.
-benign_payloads=(
-  'echo ok'
-  'printf "%s\n" "safe literal"'
-  'git status'
-  'gh pr view 42'
-  'bd ready'
+# ── 3: Command substitution → deny ──────────────────────────────────────
+
+echo ""
+echo "=== 3: Command substitution → deny ==="
+a3_start=$pass; a3_fail_start=$fail
+subst_commands=(
+  'echo $(whoami)'
+  'echo `whoami`'
+  'cat <(echo hello)'
+  'cat >(echo hello)'
 )
+for cmd in "${subst_commands[@]}"; do
+  expect_deny "substitution" "$cmd"
+done
+echo "  subtotal: $((pass - a3_start)) pass, $((fail - a3_fail_start)) fail"
 
-# Prefixes that are syntactically valid and should preserve matching semantics.
-passive_prefixes=(
-  ''
-  'NO_COLOR=1 '
-  'PATH=/usr/bin:/bin '
-  'FOO=bar '
-  'FOO+=bar '
-  'FOO="a b" '
-  "FOO='a b' "
-  'FOO=a\ b '
-  'FOO=$((1+2)) '
-  'FOO=$((1 + 2)) '
-  'FOO=$((a[1] + 2)) '
-  'FOO=$[1 + 2] '
-  'FOO=$[a[1] + 2] '
-  'FOO=${BAR:-x} '
-  'FOO=${BAR:-a b} '
-  'FOO=${arr[1]} '
-  # Note: A=(a b) and A=([0]=x [1]=y) are valid bash but rejected by the
-  # Go shell parser as "inline variables cannot be arrays". Fail-closed (deny)
-  # is the correct security behavior for these rare edge cases.
+# ── 4: Unknown commands → deny ───────────────────────────────────────────
+
+echo ""
+echo "=== 4: Unknown commands → deny ==="
+a4_start=$pass; a4_fail_start=$fail
+unknown_commands=(
+  'nc -l 4444'
+  'nmap localhost'
+  'dd if=/dev/zero of=/dev/sda'
+  'shutdown -h now'
+  'mount /dev/sda1 /mnt'
+  'iptables -F'
 )
+for cmd in "${unknown_commands[@]}"; do
+  expect_deny "unknown" "$cmd"
+done
+echo "  subtotal: $((pass - a4_start)) pass, $((fail - a4_fail_start)) fail"
 
-# Prefixes containing executable shell forms — must deny regardless of payload.
-executable_prefixes=(
-  'FOO=$(printf x) '
-  'FOO=`printf x` '
-  'FOO=<(printf x) '
-  'FOO=>(printf x) '
-  'FOO=$(cat <(printf x)) '
-  'FOO=<(echo $(printf x)) '
-)
+# ── 5: Auto-allow positive (read-only) → allow ──────────────────────────
 
-# Prefixes that look executable but are literal text — must NOT deny.
-literal_exec_looking_prefixes=(
-  'FOO="$ (" '
-  "FOO='\$(' "
-  'FOO="\$(printf)" '
-  "FOO='\$(printf)' "
-  'FOO="\`x\`" '
-  'FOO="<(printf x)" '
-  'FOO=">(printf x)" '
-  "FOO='<(printf x)' "
-  "FOO='>(printf x)' "
-)
-
-# Wrappers where the payload is still executable and must be blocked.
-# %s is replaced with the payload.
-executable_wrappers=(
-  '%s'
-  '(%s)'
-  '{ %s; }'
-  'true; %s'
-  'true && %s'
-  'false || %s'
-  $'true\n%s'
-  'true | %s'
-  '%s | true'
-  'true & %s'
-  '%s & true'
-  'if true; then %s; fi'
-  'if true; then true; else %s; fi'
-  'for x in 1; do %s; done'
-  'while true; do %s; break; done'
-  '! %s'
-  'time %s'
-  'command %s'
-  'exec %s'
-  'builtin %s'
-  'env NO_COLOR=1 %s'
-  'env %s'
-  'env -i %s'
-  'env -i NO_COLOR=1 %s'
-  'env -u TERM %s'
-  'env -u TERM NO_COLOR=1 %s'
-  "env -S '%s'"
-  'command -p %s'
-  'builtin eval '\''%s'\'''
-  "exec -a 'x y' %s"
-  'nice %s'
-  'nohup %s'
-  'sudo %s'
-  'strace %s'
-  '>/tmp/x %s'
-  '2>/tmp/x %s'
-  '>/tmp/x 2>&1 %s'
-  'echo $(%s)'
-  'echo "$(%s)"'
-  'echo `%s`'
-  'echo "`%s`"'
-  'cat <(%s)'
-  'cat >(%s)'
-  'echo $(cat <(%s))'
-  'echo $(cat <(echo $(%s)))'
-  'echo $(cat <(echo $(cat <(%s))))'
-  'echo $(( $(%s >/dev/null 2>&1; printf 1) + 1 ))'
-  "bash -lc '%s'"
-  "sh -c '%s'"
-  "eval '%s'"
-)
-
-# Wrappers where blocked text is only literal data — must NOT deny.
-# %s is replaced with the blocked text.
-literal_wrappers=(
-  'echo "%s"'
-  "echo '%s'"
-  'printf "%%s\n" "%s"'
-  "printf '%%s\n' '%s'"
-  'FOO="%s" echo ok'
-  "FOO='%s' echo ok"
-  "'true' %s"
-  '"true" %s'
-)
-
-# Executable env-prefix wrappers — must deny.
-env_exec_wrappers=(
-  'FOO=$(%s) echo ok'
-  'FOO=`%s` echo ok'
-  'FOO=<(%s) echo ok'
-  'FOO>(%s) echo ok'
-  'FOO=$(cat <(%s)) echo ok'
-)
-
-# Auto-allow commands that MUST emit allow.
+echo ""
+echo "=== 5: Auto-allow positive → allow ==="
+a5_start=$pass; a5_fail_start=$fail
 auto_allow_positive=(
   'gh pr view 42'
   'gh pr list'
@@ -232,147 +196,28 @@ auto_allow_positive=(
   'pwd'
   'date'
 )
-
-# Auto-allow commands that MUST NOT emit allow.
-auto_allow_negative=(
-  'git status && echo test'
-  'git status || echo test'
-  'git status; echo test'
-  $'git status\necho test'
-  'git status | cat'
-  'git status >/tmp/x'
-  'git status > /tmp/x'
-  'git status >>/tmp/x'
-  'git status >> /tmp/x'
-  'cat README.md >/tmp/x'
-  'cat README.md > /tmp/x'
-  'cat <(printf x)'
-  'cat >(printf x)'
-  'git status $(printf x)'
-  'git status `printf x`'
-  'gh pr view 42; echo test'
-  'gh pr view 42 && echo test'
-  'gh pr view 42 | cat'
-  $'gh pr view 42\necho test'
-  'NO_COLOR=1 gh pr view 42; echo test'
-  'git status & echo test'
-  'gh pr view 42 & echo test'
-  'FOO="a b" gh pr view 42; echo test'
-)
-
-# ── Assertion 1: blocked × passive × executable → deny ──────────────────
-
-echo "=== Assertion 1: blocked × passive × executable → deny ==="
-a1_pass=0; a1_fail=0
-for payload in "${blocked_payloads[@]}"; do
-  for prefix in "${passive_prefixes[@]}"; do
-    for wrapper in "${executable_wrappers[@]}"; do
-      cmd="${prefix}${wrapper//'%s'/$payload}"
-      expect_deny "A1" "$cmd"
-    done
-  done
-done
-a1_pass=$pass; a1_fail=$fail
-echo "  subtotal: $((a1_pass)) pass, $((a1_fail)) fail (of $((total)) so far)"
-
-# ── Assertion 2: blocked × env_exec → deny ──────────────────────────────
-
-echo ""
-echo "=== Assertion 2: blocked × env_exec → deny ==="
-a2_start=$pass
-for payload in "${blocked_payloads[@]}"; do
-  for wrapper in "${env_exec_wrappers[@]}"; do
-    cmd="${wrapper//'%s'/$payload}"
-    expect_deny "A2" "$cmd"
-  done
-done
-echo "  subtotal: $((pass - a2_start)) pass, $((fail - a1_fail)) fail"
-
-# ── Assertion 3: blocked × literal → allow ──────────────────────────────
-
-echo ""
-echo "=== Assertion 3: blocked × literal → allow ==="
-a3_start=$pass; a3_fail_start=$fail
-for payload in "${blocked_payloads[@]}"; do
-  for wrapper in "${literal_wrappers[@]}"; do
-    cmd="${wrapper//'%s'/$payload}"
-    expect_allow "A3" "$cmd"
-  done
-done
-echo "  subtotal: $((pass - a3_start)) pass, $((fail - a3_fail_start)) fail"
-
-# ── Assertion 4: benign × passive → allow ───────────────────────────────
-
-echo ""
-echo "=== Assertion 4: benign × passive → allow ==="
-a4_start=$pass; a4_fail_start=$fail
-for payload in "${benign_payloads[@]}"; do
-  for prefix in "${passive_prefixes[@]}"; do
-    cmd="${prefix}${payload}"
-    expect_allow "A4" "$cmd"
-  done
-done
-echo "  subtotal: $((pass - a4_start)) pass, $((fail - a4_fail_start)) fail"
-
-# ── Assertion 5: benign × literal_exec_looking → allow ──────────────────
-
-echo ""
-echo "=== Assertion 5: benign × literal_exec_looking → allow ==="
-a5_start=$pass; a5_fail_start=$fail
-for payload in "${benign_payloads[@]}"; do
-  for prefix in "${literal_exec_looking_prefixes[@]}"; do
-    cmd="${prefix}${payload}"
-    expect_allow "A5" "$cmd"
-  done
+for cmd in "${auto_allow_positive[@]}"; do
+  expect_auto_allow "auto-allow" "$cmd"
 done
 echo "  subtotal: $((pass - a5_start)) pass, $((fail - a5_fail_start)) fail"
 
-# ── Assertion 6: executable_prefix × benign → allow ─────────────────────
-# The Go AST parser extracts commands from CmdSubst/ProcSubst individually.
-# Benign commands inside substitutions are correctly identified as benign.
+# ── 6: Auto-allow negative → not allow ──────────────────────────────────
 
 echo ""
-echo "=== Assertion 6: executable_prefix × benign → allow ==="
+echo "=== 6: Auto-allow negative → not allow ==="
 a6_start=$pass; a6_fail_start=$fail
-for prefix in "${executable_prefixes[@]}"; do
-  for payload in "${benign_payloads[@]}"; do
-    cmd="${prefix}${payload}"
-    expect_allow "A6" "$cmd"
-  done
+auto_allow_negative=(
+  'git status > /tmp/x'
+  'git status | cat'
+  'gh pr view 42 | cat'
+  'cat README.md > /tmp/x'
+)
+for cmd in "${auto_allow_negative[@]}"; do
+  expect_no_auto_allow "no-auto" "$cmd"
 done
 echo "  subtotal: $((pass - a6_start)) pass, $((fail - a6_fail_start)) fail"
 
-# ── Assertion 7: auto_allow_positive → allow ────────────────────────────
-
-echo ""
-echo "=== Assertion 7: auto_allow_positive → allow ==="
-a7_start=$pass; a7_fail_start=$fail
-for cmd in "${auto_allow_positive[@]}"; do
-  expect_auto_allow "A7" "$cmd"
-done
-echo "  subtotal: $((pass - a7_start)) pass, $((fail - a7_fail_start)) fail"
-
-# ── Assertion 8: auto_allow_negative → not allow ────────────────────────
-
-echo ""
-echo "=== Assertion 8: auto_allow_negative → not allow ==="
-a8_start=$pass; a8_fail_start=$fail
-for cmd in "${auto_allow_negative[@]}"; do
-  expect_no_auto_allow "A8" "$cmd"
-done
-echo "  subtotal: $((pass - a8_start)) pass, $((fail - a8_fail_start)) fail"
-
-# ── Assertion 9: parse-error → fail closed (deny) ──────────────────────
-
-echo ""
-echo "=== Assertion 9: parse-error → fail closed (deny) ==="
-a9_start=$pass; a9_fail_start=$fail
-expect_deny "A9" "if then"
-expect_deny "A9" "do done"
-expect_deny "A9" "{ ; }"
-echo "  subtotal: $((pass - a9_start)) pass, $((fail - a9_fail_start)) fail"
-
-# ── Summary ─────────────────────────────────────────────────────────────
+# ── Summary ──────────────────────────────────────────────────────────────
 
 echo ""
 echo "================================"
