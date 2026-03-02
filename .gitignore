@@ -2,3 +2,6 @@
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+# Go built binaries
+scripts/hooks/cmdpolicy/cmdpolicy
