@@ -229,9 +229,15 @@ split_command_segments() {
           ((i++)); start=$i; continue
         fi ;;
       '&')
-        if (( sd == 0 )) && (( i + 1 < len )) && [[ ${s:i+1:1} == '&' ]]; then
-          printf '%s\n' "${s:start:i-start}"
-          ((i += 2)); start=$i; continue
+        if (( sd == 0 )); then
+          if (( i + 1 < len )) && [[ ${s:i+1:1} == '&' ]]; then
+            printf '%s\n' "${s:start:i-start}"
+            ((i += 2)); start=$i; continue
+          else
+            # Single & (background operator) — also a separator
+            printf '%s\n' "${s:start:i-start}"
+            ((i++)); start=$i; continue
+          fi
         fi ;;
       '|')
         if (( sd == 0 )); then

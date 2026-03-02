@@ -154,6 +154,8 @@ executable_wrappers=(
   $'true\n%s'
   'true | %s'
   '%s | true'
+  'true & %s'
+  '%s & true'
   'echo $(%s)'
   'echo "$(%s)"'
   'echo `%s`'
@@ -224,6 +226,8 @@ auto_allow_negative=(
   'gh pr view 42 | cat'
   $'gh pr view 42\necho test'
   'NO_COLOR=1 gh pr view 42; echo test'
+  'git status & echo test'
+  'gh pr view 42 & echo test'
   'FOO="a b" gh pr view 42; echo test'
 )
 

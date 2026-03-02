@@ -20,7 +20,7 @@ esac
 if [ "$tool_name" = "Bash" ] && [ -n "$command" ]; then
   # Reject anything with shell operators that could chain or embed writes
   # (pipes, redirections, command chaining, command/process substitution, etc.)
-  if echo "$command" | grep -qE '>|[|]|&&|;|\|\||\$\(|`|<\(' ; then
+  if echo "$command" | grep -qE '>|[|]|&|;|\|\||\$\(|`|<\(' ; then
     # Contains shell operator — not safe, let the normal permission flow handle it
     exit 0
   fi
