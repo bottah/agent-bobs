@@ -166,6 +166,17 @@ if ! command=$(normalize_command_prefix "$command"); then
   exit 0
 fi
 
+# Strip leading shell grouping syntax so anchored rules can match
+# the actual command inside subshells ( ) and brace groups { }.
+while true; do
+  case "$command" in
+    '('*) command="${command#(}" ;;
+    '{ '*) command="${command#\{ }" ;;
+    ' '*) command="${command# }" ;;
+    *) break ;;
+  esac
+done
+
 i=0
 while [ "$i" -lt "$rule_count" ]; do
   match=$(jq -r ".rules[$i].match // empty" "$POLICY_FILE")
