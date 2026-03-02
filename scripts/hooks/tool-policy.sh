@@ -100,7 +100,7 @@ normalize_command_prefix() {
     token=${s:start:i-start}
 
     # First non-assignment token: this is the real command.
-    if [[ ! $token =~ ^[A-Za-z_][A-Za-z_0-9]*= ]]; then
+    if [[ ! $token =~ ^[A-Za-z_][A-Za-z_0-9]*\+?= ]]; then
       printf '%s\n' "${s:start}"
       return 0
     fi
