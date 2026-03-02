@@ -28,6 +28,7 @@ exclude=(
   --exclude='.claude/subagent.log'
   --exclude='.claude/transcript-backups'
   --exclude='docs/handoff-*.md'
+  --exclude='docs/internal/'
   --exclude='.beads'
   --exclude='.claude/beads-audit.log'
 )
