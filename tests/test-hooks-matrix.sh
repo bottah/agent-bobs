@@ -1,5 +1,5 @@
 #!/bin/bash
-# Whitelist-based hook tests for tool-policy.sh and auto-allow-reads.sh
+# Tests for tool-policy.sh (inter-agent interface rules)
 # Run from repo root: bash tests/test-hooks-matrix.sh
 
 set -euo pipefail
@@ -9,10 +9,6 @@ pass=0; fail=0; total=0
 
 tool_policy() {
   jq -n --arg cmd "$1" '{tool_input:{command:$cmd}}' | bash "$SCRIPT_DIR/scripts/hooks/tool-policy.sh" 2>/dev/null
-}
-
-auto_allow() {
-  jq -n --arg cmd "$1" '{tool_name:"Bash",tool_input:{command:$cmd}}' | bash "$SCRIPT_DIR/scripts/hooks/auto-allow-reads.sh" 2>/dev/null
 }
 
 expect_deny() {
@@ -45,164 +41,58 @@ expect_allow() {
   fi
 }
 
-expect_auto_allow() {
-  local desc="$1" cmd="$2"
-  total=$((total + 1))
-  local result
-  result=$(auto_allow "$cmd")
-  if echo "$result" | grep -q '"allow"'; then
-    pass=$((pass + 1))
-  else
-    echo "FAIL [auto]:  $desc  (expected allow)"
-    echo "       cmd:   $cmd"
-    echo "       got:   ${result:-(empty/defer)}"
-    fail=$((fail + 1))
-  fi
-}
+# ── 1: Push to main/master → deny ─────────────────────────────────────
 
-expect_no_auto_allow() {
-  local desc="$1" cmd="$2"
-  total=$((total + 1))
-  local result
-  result=$(auto_allow "$cmd")
-  if [ -z "$result" ] || ! echo "$result" | grep -q '"allow"'; then
-    pass=$((pass + 1))
-  else
-    echo "FAIL [noauto]: $desc  (should NOT auto-allow)"
-    echo "       cmd:    $cmd"
-    echo "       got:    $result"
-    fail=$((fail + 1))
-  fi
-}
-
-# ── 1: Allowed git/gh commands ───────────────────────────────────────────
-
-echo "=== 1: Allowed git/gh commands ==="
-allowed_commands=(
-  'git status'
-  'git log --oneline -5'
-  'git diff HEAD~1'
-  'git show HEAD'
-  'git branch -a'
-  'git fetch origin'
-  'git add file.go'
-  'git commit -m "feat: add feature"'
-  'git push origin feat/my-branch'
-  'git push -u origin feat/my-branch'
-  'git push origin feat/domain-fix'
-  'git push origin maintainers-docs'
-  'git checkout -b feat/new'
-  'git rebase origin/main'
-  'git stash'
-  'git stash list'
-  'gh pr view 42'
-  'gh pr list'
-  'gh pr create --title "test" --body "body"'
-  'gh pr comment 42 --body "lgtm"'
-  'gh pr merge 42 --squash'
-  'gh issue view 1'
-  'gh issue list'
-  'gh api repos/o/r/pulls/1/reviews --paginate'
-  'gh run view 123'
-)
-for cmd in "${allowed_commands[@]}"; do
-  expect_allow "whitelist" "$cmd"
-done
+echo "=== 1: Push to main/master → deny ==="
+expect_deny "push main"   "git push origin main"
+expect_deny "push master" "git push origin master"
+expect_deny "push -u main" "git push -u origin main"
 echo "  subtotal: $pass pass, $fail fail"
 
-# ── 2: Denied git/gh commands ────────────────────────────────────────────
+# ── 2: Push to feature branches → allow ──────────────────────────────
 
 echo ""
-echo "=== 2: Denied git/gh commands ==="
+echo "=== 2: Push to feature branches → allow ==="
 a2_start=$pass; a2_fail_start=$fail
-denied_commands=(
-  'git push origin main'
-  'git push origin master'
-  'git push -u origin main'
-  'gh pr merge 42 --merge'
-  'gh pr merge 42 --admin'
-  'gh pr merge 42'
-)
-for cmd in "${denied_commands[@]}"; do
-  expect_deny "explicit-deny" "$cmd"
-done
+expect_allow "feat branch"      "git push origin feat/my-branch"
+expect_allow "feat -u"          "git push -u origin feat/my-branch"
+expect_allow "domain-fix"       "git push origin feat/domain-fix"
+expect_allow "maintainers-docs" "git push origin maintainers-docs"
 echo "  subtotal: $((pass - a2_start)) pass, $((fail - a2_fail_start)) fail"
 
-# ── 3: Non-git/gh commands → deny ───────────────────────────────────────
+# ── 3: PR merge without --squash → deny ─────────────────────────────
 
 echo ""
-echo "=== 3: Non-git/gh commands → deny ==="
+echo "=== 3: PR merge without --squash → deny ==="
 a3_start=$pass; a3_fail_start=$fail
-blocked_commands=(
-  'cat README.md'
-  'ls -la'
-  'echo hello'
-  'curl https://example.com'
-  'rm file.tmp'
-  'bash script.sh'
-  'python script.py'
-  'node app.js'
-  'nc -l 4444'
-)
-for cmd in "${blocked_commands[@]}"; do
-  expect_deny "not-git-gh" "$cmd"
-done
+expect_deny "merge default" "gh pr merge 42"
+expect_deny "merge --merge" "gh pr merge 42 --merge"
+expect_deny "merge --admin" "gh pr merge 42 --admin"
 echo "  subtotal: $((pass - a3_start)) pass, $((fail - a3_fail_start)) fail"
 
-# ── 4: Command substitution → deny ──────────────────────────────────────
+# ── 4: PR merge with --squash → allow ───────────────────────────────
 
 echo ""
-echo "=== 4: Command substitution → deny ==="
+echo "=== 4: PR merge with --squash → allow ==="
 a4_start=$pass; a4_fail_start=$fail
-subst_commands=(
-  'echo $(whoami)'
-  'echo `whoami`'
-  'cat <(echo hello)'
-  'cat >(echo hello)'
-)
-for cmd in "${subst_commands[@]}"; do
-  expect_deny "substitution" "$cmd"
-done
+expect_allow "squash merge" "gh pr merge 42 --squash"
 echo "  subtotal: $((pass - a4_start)) pass, $((fail - a4_fail_start)) fail"
 
-# ── 5: Auto-allow positive (read-only) → allow ──────────────────────────
+# ── 5: Other commands pass through ───────────────────────────────────
 
 echo ""
-echo "=== 5: Auto-allow positive → allow ==="
+echo "=== 5: Other commands pass through ==="
 a5_start=$pass; a5_fail_start=$fail
-auto_allow_positive=(
-  'gh pr view 42'
-  'gh pr list'
-  'gh pr diff 42'
-  'git status'
-  'git log --oneline -5'
-  'bd ready'
-  'cat README.md'
-  'pwd'
-  'date'
-)
-for cmd in "${auto_allow_positive[@]}"; do
-  expect_auto_allow "auto-allow" "$cmd"
-done
+expect_allow "git status"  "git status"
+expect_allow "git log"     "git log --oneline -5"
+expect_allow "gh pr view"  "gh pr view 42"
+expect_allow "gh pr list"  "gh pr list"
+expect_allow "cat"         "cat README.md"
+expect_allow "ls"          "ls -la"
+expect_allow "echo"        "echo hello"
 echo "  subtotal: $((pass - a5_start)) pass, $((fail - a5_fail_start)) fail"
 
-# ── 6: Auto-allow negative → not allow ──────────────────────────────────
-
-echo ""
-echo "=== 6: Auto-allow negative → not allow ==="
-a6_start=$pass; a6_fail_start=$fail
-auto_allow_negative=(
-  'git status > /tmp/x'
-  'git status | cat'
-  'gh pr view 42 | cat'
-  'cat README.md > /tmp/x'
-)
-for cmd in "${auto_allow_negative[@]}"; do
-  expect_no_auto_allow "no-auto" "$cmd"
-done
-echo "  subtotal: $((pass - a6_start)) pass, $((fail - a6_fail_start)) fail"
-
-# ── Summary ──────────────────────────────────────────────────────────────
+# ── Summary ──────────────────────────────────────────────────────────
 
 echo ""
 echo "================================"
