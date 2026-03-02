@@ -287,7 +287,9 @@ extract_subst_segments() {
   done
 }
 
-IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command" | extract_subst_segments)"
+# Extract substitution contents, piped twice to handle nested substitutions
+# (e.g., echo $(cat <(blocked-cmd)) — first pass extracts $(), second extracts <()).
+IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command" | extract_subst_segments | extract_subst_segments)"
 
 i=0
 while [ "$i" -lt "$rule_count" ]; do
