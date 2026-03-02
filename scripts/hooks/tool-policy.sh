@@ -90,9 +90,9 @@ normalize_command_prefix() {
 
     # The tokenizer above already walked quotes and escapes to find the
     # correct token boundary. Reject only values with command substitution
-    # ($() or backticks) which could execute arbitrary code. All other
-    # values (plain, quoted, escaped) are safe to strip.
-    if [[ $value == *'$('* ]] || [[ $value == *'`'* ]]; then
+    # ($() or backticks) which could execute arbitrary code. Single-quoted
+    # values are always literal — $() and backticks are not evaluated.
+    if [[ $value != \'* ]] && { [[ $value == *'$('* ]] || [[ $value == *'`'* ]]; }; then
       return 1
     fi
 
