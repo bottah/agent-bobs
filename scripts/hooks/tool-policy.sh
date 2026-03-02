@@ -388,10 +388,12 @@ while [ "$i" -lt "$rule_count" ]; do
 
   if [ -n "$match" ]; then
     for seg in "${segments[@]}"; do
-      # Strip leading whitespace and grouping syntax from each segment
+      # Strip leading whitespace, grouping syntax, and compound-command keywords
       while true; do
         case "$seg" in
           '('*) seg="${seg#(}" ;; '{ '*) seg="${seg#\{ }" ;;
+          'then '*) seg="${seg#then }" ;; 'else '*) seg="${seg#else }" ;;
+          'do '*) seg="${seg#do }" ;; '! '*) seg="${seg#! }" ;;
           ' '*|$'\t'*) seg="${seg#?}" ;; *) break ;;
         esac
       done
