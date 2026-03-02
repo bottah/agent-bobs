@@ -117,6 +117,7 @@ normalize_command_prefix() {
         '(') ((paren_depth++)) ;;
         ')') (( paren_depth > 0 )) && ((paren_depth--)) ;;
         '}') (( brace_depth > 0 )) && ((brace_depth--)) ;;
+        '[') (( bracket_depth > 0 )) && ((bracket_depth++)) ;;
         ']') (( bracket_depth > 0 )) && ((bracket_depth--)) ;;
         '`') has_cmd_subst=1 ;;
       esac
