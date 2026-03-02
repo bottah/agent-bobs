@@ -166,9 +166,53 @@ if ! command=$(normalize_command_prefix "$command"); then
   exit 0
 fi
 
-# Split on shell separators (;, &&, ||, newlines) to check each sub-command.
-# Then strip leading grouping syntax so anchored rules match the actual command.
-IFS=$'\n' read -r -d '' -a segments <<< "$(printf '%s' "$command" | sed 's/&&/\n/g; s/||/\n/g; s/;/\n/g')"
+# Quote-aware split on shell separators (;, &&, ||, |, newlines).
+# Respects single/double quotes and backslash escapes so separators
+# inside string arguments don't cause false positives.
+split_command_segments() {
+  local s="$1"
+  local len=${#s}
+  local i=0 start=0
+  local c sq=0 dq=0 esc=0
+
+  while (( i < len )); do
+    c=${s:i:1}
+
+    if (( esc )); then esc=0; ((i++)); continue; fi
+    if (( sq )); then [[ $c == "'" ]] && sq=0; ((i++)); continue; fi
+    if (( dq )); then
+      case "$c" in \\) esc=1 ;; '"') dq=0 ;; esac
+      ((i++)); continue
+    fi
+
+    case "$c" in
+      \\) esc=1 ;;
+      "'") sq=1 ;;
+      '"') dq=1 ;;
+      ';' | $'\n')
+        printf '%s\n' "${s:start:i-start}"
+        ((i++)); start=$i; continue ;;
+      '&')
+        if (( i + 1 < len )) && [[ ${s:i+1:1} == '&' ]]; then
+          printf '%s\n' "${s:start:i-start}"
+          ((i += 2)); start=$i; continue
+        fi ;;
+      '|')
+        if (( i + 1 < len )) && [[ ${s:i+1:1} == '|' ]]; then
+          printf '%s\n' "${s:start:i-start}"
+          ((i += 2)); start=$i; continue
+        else
+          printf '%s\n' "${s:start:i-start}"
+          ((i++)); start=$i; continue
+        fi ;;
+    esac
+    ((i++))
+  done
+
+  (( start < len )) && printf '%s\n' "${s:start}"
+}
+
+IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command")"
 
 i=0
 while [ "$i" -lt "$rule_count" ]; do
