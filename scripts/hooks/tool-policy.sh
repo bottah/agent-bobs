@@ -212,7 +212,52 @@ split_command_segments() {
   (( start < len )) && printf '%s\n' "${s:start}"
 }
 
-IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command")"
+# Extract command substitution contents ($(...) and backticks) as additional
+# segments so blocked commands inside substitutions are also checked.
+extract_subst_segments() {
+  local seg
+  while IFS= read -r seg; do
+    printf '%s\n' "$seg"
+    local s="$seg"
+    local len=${#s} i=0 c sq=0 dq=0 esc=0 depth start
+    while (( i < len )); do
+      c=${s:i:1}
+      if (( esc )); then esc=0; ((i++)); continue; fi
+      if (( sq )); then [[ $c == "'" ]] && sq=0; ((i++)); continue; fi
+      if (( dq )); then
+        case "$c" in \\) esc=1 ;; '"') dq=0 ;; esac
+        ((i++)); continue
+      fi
+      case "$c" in
+        \\) esc=1 ;;
+        "'") sq=1 ;;
+        '"') dq=1 ;;
+        '$')
+          if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+            if (( i+2 < len )) && [[ ${s:i+2:1} == '(' ]]; then
+              ((i++))  # $(( = arithmetic, skip
+            else
+              # $( = command substitution — extract inner content
+              ((i += 2)); start=$i; depth=1
+              while (( i < len && depth > 0 )); do
+                case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
+                (( depth > 0 )) && ((i++))
+              done
+              printf '%s\n' "${s:start:i-start}"
+            fi
+          fi ;;
+        '`')
+          ((i++)); start=$i
+          while (( i < len )) && [[ ${s:i:1} != '`' ]]; do ((i++)); done
+          printf '%s\n' "${s:start:i-start}"
+          ;;
+      esac
+      ((i++))
+    done
+  done
+}
+
+IFS=$'\n' read -r -d '' -a segments <<< "$(split_command_segments "$command" | extract_subst_segments)"
 
 i=0
 while [ "$i" -lt "$rule_count" ]; do
