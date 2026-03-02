@@ -18,9 +18,9 @@ esac
 
 # Safe bash commands — read-only operations only
 if [ "$tool_name" = "Bash" ] && [ -n "$command" ]; then
-  # Reject anything with shell operators that could chain or redirect writes
-  # (pipes, redirections, command chaining via && ; ||, etc.)
-  if echo "$command" | grep -qE '>\s|>>|[|]|&&|;|\|\|' ; then
+  # Reject anything with shell operators that could chain or embed writes
+  # (pipes, redirections, command chaining, command substitution, etc.)
+  if echo "$command" | grep -qE '>\s|>>|[|]|&&|;|\|\||\$\(|`' ; then
     # Contains shell operator — not safe, let the normal permission flow handle it
     exit 0
   fi

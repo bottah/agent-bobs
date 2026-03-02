@@ -105,9 +105,14 @@ normalize_command_prefix() {
   printf '\n'
 }
 
+raw_command="$command"
+normalize_failed=false
 if ! command=$(normalize_command_prefix "$command"); then
-  echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool policy: complex env-var prefixes are blocked; remove the prefix or use a wrapper script."}}'
-  exit 0
+  # Normalization failed (complex env-var prefix). Don't deny yet — only
+  # deny if the raw command would plausibly match a policy rule, so we
+  # don't block unrelated commands like FOO="a b" echo ok.
+  normalize_failed=true
+  command="$raw_command"
 fi
 
 # Read each rule from the policy file
@@ -147,6 +152,25 @@ while [ "$i" -lt "$rule_count" ]; do
       escaped_message=$(echo "$message" | sed 's/"/\\"/g')
       echo "{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Tool policy: $escaped_message\"}}"
       exit 0
+    fi
+
+    # If normalization failed and the rule pattern appears anywhere in the raw
+    # command (unanchored check), fail closed — the complex env-var prefix is
+    # likely a bypass attempt for this rule.
+    if [ "$normalize_failed" = true ] && [ -n "$match" ]; then
+      unanchored=${match#^}
+      bypass=false
+      if [ "$mode" = "regex" ]; then
+        echo "$raw_command" | grep -qE "$unanchored" 2>/dev/null && bypass=true
+      elif [ "$mode" = "pcre" ]; then
+        echo "$raw_command" | perl -ne "exit 0 if /$unanchored/; exit 1" 2>/dev/null && bypass=true
+      else
+        [[ "$raw_command" == *"$unanchored"* ]] && bypass=true
+      fi
+      if [ "$bypass" = true ]; then
+        echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool policy: complex env-var prefixes are blocked; remove the prefix or use a wrapper script."}}'
+        exit 0
+      fi
     fi
   fi
 
