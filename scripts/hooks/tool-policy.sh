@@ -225,7 +225,27 @@ extract_subst_segments() {
       if (( esc )); then esc=0; ((i++)); continue; fi
       if (( sq )); then [[ $c == "'" ]] && sq=0; ((i++)); continue; fi
       if (( dq )); then
-        case "$c" in \\) esc=1 ;; '"') dq=0 ;; esac
+        case "$c" in
+          \\) esc=1 ;;
+          '"') dq=0 ;;
+          '$')
+            # $() inside double quotes still executes
+            if (( i+1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
+              if ! (( i+2 < len )) || [[ ${s:i+2:1} != '(' ]]; then
+                ((i += 2)); start=$i; depth=1
+                while (( i < len && depth > 0 )); do
+                  case "${s:i:1}" in '(') ((depth++)) ;; ')') ((depth--)) ;; esac
+                  (( depth > 0 )) && ((i++))
+                done
+                printf '%s\n' "${s:start:i-start}"
+              fi
+            fi ;;
+          '`')
+            ((i++)); start=$i
+            while (( i < len )) && [[ ${s:i:1} != '`' ]]; do ((i++)); done
+            printf '%s\n' "${s:start:i-start}"
+            ;;
+        esac
         ((i++)); continue
       fi
       case "$c" in
