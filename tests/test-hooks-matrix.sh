@@ -161,6 +161,7 @@ executable_wrappers=(
   'for x in 1; do %s; done'
   'while true; do %s; break; done'
   '! %s'
+  'time %s'
   'echo $(%s)'
   'echo "$(%s)"'
   'echo `%s`'
