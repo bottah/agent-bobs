@@ -79,11 +79,6 @@ normalize_command_prefix() {
                 has_cmd_subst=1
               fi
             fi ;;
-          '<' | '>')
-            # <( and >( = process substitution inside double quotes
-            if (( i + 1 < len )) && [[ ${s:i+1:1} == '(' ]]; then
-              has_cmd_subst=1
-            fi ;;
           '`') has_cmd_subst=1 ;;
         esac
         ((i++))
