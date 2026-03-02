@@ -45,12 +45,13 @@ normalize_command_prefix() {
     local has_cmd_subst=0
     local paren_depth=0
     local brace_depth=0
+    local bracket_depth=0
 
     # Read one shell-ish token, honoring quotes and backslash escapes well
     # enough to find token boundaries without evaluating anything.
     # Track unescaped $( and backticks to detect command substitution.
-    # Track paren/brace depth so spaces inside expansions don't break the token:
-    #   $(( )) arithmetic, ( ) array values, ${ } parameter expansion.
+    # Track paren/brace/bracket depth so spaces inside expansions don't
+    # break the token: $(( )) arithmetic, ( ) arrays, ${ } params, $[ ] legacy.
     while (( i < len )); do
       c=${s:i:1}
 
@@ -87,7 +88,7 @@ normalize_command_prefix() {
       case "$c" in
         ' ' | $'\t')
           # Don't break inside expansions — spaces are valid there
-          if (( paren_depth > 0 || brace_depth > 0 )); then :; else break; fi ;;
+          if (( paren_depth > 0 || brace_depth > 0 || bracket_depth > 0 )); then :; else break; fi ;;
         \\) esc=1 ;;
         "'") in_s=1 ;;
         '"') in_d=1 ;;
@@ -107,11 +108,16 @@ normalize_command_prefix() {
                 # ${ = parameter expansion — track brace depth
                 ((brace_depth++))
                 ((i++)) ;;
+              '[')
+                # $[ = legacy arithmetic expansion — track bracket depth
+                ((bracket_depth++))
+                ((i++)) ;;
             esac
           fi ;;
         '(') ((paren_depth++)) ;;
         ')') (( paren_depth > 0 )) && ((paren_depth--)) ;;
         '}') (( brace_depth > 0 )) && ((brace_depth--)) ;;
+        ']') (( bracket_depth > 0 )) && ((bracket_depth--)) ;;
         '`') has_cmd_subst=1 ;;
       esac
       ((i++))
